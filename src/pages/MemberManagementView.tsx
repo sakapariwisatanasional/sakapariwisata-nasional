@@ -23,7 +23,9 @@ import {
   Edit3,
   Shield,
   ShieldCheck,
-  ShieldAlert
+  ShieldAlert,
+  Trash2,
+  AlertTriangle
 } from 'lucide-react';
 import { Member, CurrentUser, Province, Regency } from '../types';
 import { DigitalMemberCard } from '../components/member/DigitalMemberCard';
@@ -42,6 +44,8 @@ interface MemberManagementViewProps {
   onOpenEditMemberModal?: (member: Member) => void;
   onOpenPrintPdfModal?: (member: Member) => void;
   onOpenOperatorModal?: (member: Member) => void;
+  onDeleteMember?: (member: Member) => void;
+  onDeleteAllDummyMembers?: () => void;
 }
 
 export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
@@ -57,13 +61,17 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
   onOpenEditPhotoModal,
   onOpenEditMemberModal,
   onOpenPrintPdfModal,
-  onOpenOperatorModal
+  onOpenOperatorModal,
+  onDeleteMember,
+  onDeleteAllDummyMembers
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStatus, setSelectedStatus] = useState<string>('ALL');
   const [selectedProvinceId, setSelectedProvinceId] = useState<string>('ALL');
   const [selectedKrida, setSelectedKrida] = useState<string>('ALL');
   const [previewCardMember, setPreviewCardMember] = useState<Member | null>(null);
+  const [memberToDelete, setMemberToDelete] = useState<Member | null>(null);
+  const [showClearAllModal, setShowClearAllModal] = useState(false);
 
   // Filter logic
   const filteredMembers = useMemo(() => {
@@ -163,6 +171,18 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
             >
               <Sliders className="w-3.5 h-3.5 text-amber-700" />
               <span>Edit Desain KTA</span>
+            </button>
+          )}
+
+          {/* Tombol Hapus Dummy untuk Super Admin */}
+          {currentUser.role === 'SUPER_ADMIN' && onDeleteAllDummyMembers && (
+            <button
+              onClick={() => setShowClearAllModal(true)}
+              className="px-3.5 py-2 bg-red-50 hover:bg-red-100 border border-red-200 text-red-700 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
+              title="Hapus / Bersihkan semua data dummy dari aplikasi"
+            >
+              <Trash2 className="w-3.5 h-3.5 text-red-600" />
+              <span>Hapus Dummy</span>
             </button>
           )}
 
@@ -454,6 +474,17 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
                           <ArrowRightLeft className="w-4 h-4" />
                         </button>
 
+                        {/* Hapus Anggota (Hak Super Admin) */}
+                        {currentUser.role === 'SUPER_ADMIN' && onDeleteMember && (
+                          <button
+                            onClick={() => setMemberToDelete(m)}
+                            className="p-1.5 bg-red-50 hover:bg-red-100 text-red-600 hover:text-red-800 rounded-lg transition-colors border border-red-200 cursor-pointer"
+                            title="Hapus Data Anggota Ini (Super Admin)"
+                          >
+                            <Trash2 className="w-4 h-4 text-red-600" />
+                          </button>
+                        )}
+
                         {/* Approve Button for Pending */}
                         {m.status === 'PENDING' && (
                           <button
@@ -513,6 +544,114 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
                 className="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold"
               >
                 Tutup
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Konfirmasi Hapus 1 Anggota (Super Admin) */}
+      {memberToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xs animate-in fade-in">
+          <div className="bg-white rounded-3xl p-6 shadow-2xl border border-red-200 max-w-md w-full space-y-4">
+            <div className="flex items-center gap-3 text-red-600">
+              <div className="w-10 h-10 rounded-2xl bg-red-100 flex items-center justify-center">
+                <AlertTriangle className="w-5 h-5 text-red-600" />
+              </div>
+              <div>
+                <h3 className="font-bold text-base text-slate-900 font-heading">
+                  Konfirmasi Hapus Anggota
+                </h3>
+                <p className="text-xs text-red-600 font-medium">Tindakan ini tidak dapat dibatalkan</p>
+              </div>
+            </div>
+
+            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-2 text-xs">
+              <div className="flex items-center gap-3">
+                <img
+                  src={memberToDelete.avatarUrl}
+                  alt={memberToDelete.fullName}
+                  className="w-12 h-12 rounded-xl object-cover border border-slate-300"
+                />
+                <div>
+                  <p className="font-bold text-slate-900 text-sm">{memberToDelete.fullName}</p>
+                  <p className="text-[11px] text-purple-700 font-mono font-semibold">
+                    {memberToDelete.nationalMemberNumber || 'Belum ada NTA'}
+                  </p>
+                  <p className="text-slate-500">{memberToDelete.branchName}, {memberToDelete.regencyName}</p>
+                </div>
+              </div>
+              <p className="text-slate-600 pt-1 border-t border-slate-200 text-[11px]">
+                Data keanggotaan, KTA Digital, serta riwayat akan dihapus secara permanen dari database.
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setMemberToDelete(null)}
+                className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (onDeleteMember) {
+                    onDeleteMember(memberToDelete);
+                  }
+                  setMemberToDelete(null);
+                }}
+                className="px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold shadow-md shadow-red-950/20 transition-all flex items-center gap-1.5 cursor-pointer"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>Hapus Anggota Ini</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Konfirmasi Bersihkan Semua Data Dummy */}
+      {showClearAllModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xs animate-in fade-in">
+          <div className="bg-white rounded-3xl p-6 shadow-2xl border border-red-200 max-w-md w-full space-y-4">
+            <div className="flex items-center gap-3 text-red-600">
+              <div className="w-10 h-10 rounded-2xl bg-red-100 flex items-center justify-center">
+                <Trash2 className="w-5 h-5 text-red-600" />
+              </div>
+              <div>
+                <h3 className="font-bold text-base text-slate-900 font-heading">
+                  Bersihkan Seluruh Anggota Dummy?
+                </h3>
+                <p className="text-xs text-red-600 font-medium">Pengaturan Basis Data Bersih</p>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Anda akan mengosongkan seluruh data anggota contoh/dummy dari database aplikasi untuk memulai pendataan resmi yang baru atau menyinkronkan dari Google Spreadsheet.
+            </p>
+
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowClearAllModal(false)}
+                className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (onDeleteAllDummyMembers) {
+                    onDeleteAllDummyMembers();
+                  }
+                  setShowClearAllModal(false);
+                }}
+                className="px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold shadow-md shadow-red-950/20 transition-all flex items-center gap-1.5 cursor-pointer"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>Ya, Hapus Seluruh Dummy</span>
               </button>
             </div>
           </div>

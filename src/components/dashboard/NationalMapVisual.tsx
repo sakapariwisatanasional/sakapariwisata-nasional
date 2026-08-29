@@ -25,7 +25,7 @@ export const NationalMapVisual: React.FC<NationalMapVisualProps> = ({
           <span>Distribusi Keanggotaan Terpadu (38 Provinsi)</span>
         </h3>
         <span className="text-[11px] font-mono font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-200">
-          Total: {totalMembers.toLocaleString('id-ID')} Anggota
+          Total: {(totalMembers || 0).toLocaleString('id-ID')} Anggota
         </span>
       </div>
 
@@ -46,7 +46,7 @@ export const NationalMapVisual: React.FC<NationalMapVisualProps> = ({
                   {prov.name}
                   <span className="text-[10px] text-slate-400 font-normal">({prov.island})</span>
                 </span>
-                <span className="font-mono text-slate-800">{count.toLocaleString('id-ID')} ({percentage}%)</span>
+                <span className="font-mono text-slate-800">{(count || 0).toLocaleString('id-ID')} ({percentage}%)</span>
               </div>
               <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden p-0.5 border border-slate-200/50">
                 <div 

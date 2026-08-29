@@ -4,19 +4,35 @@ import {
   Utensils, 
   Gift, 
   MapPin, 
-  Upload, 
   CheckCircle, 
   Sparkles, 
-  DollarSign, 
   Phone, 
   Tag, 
   BookOpen, 
   Store, 
-  Image as ImageIcon 
+  Image as ImageIcon,
+  FolderOpen,
+  ExternalLink,
+  Compass,
+  Camera,
+  Tent,
+  ShoppingBag,
+  ShieldCheck,
+  Clock
 } from 'lucide-react';
-import { CulinarySouvenirItem, CurrentUser, ProductKind, Province, Regency, District } from '../../types';
+import { 
+  CulinarySouvenirItem, 
+  CurrentUser, 
+  ProductKind, 
+  KridaType, 
+  KridaProductCategory, 
+  Province, 
+  Regency, 
+  District 
+} from '../../types';
 import { storage } from '../../services/storage';
 import { PROVINCES_DATA, REGENCIES_DATA, getDistrictsForRegency } from '../../data/indonesiaTerritories';
+import { GOOGLE_DRIVE_MAIN_FOLDER, formatGoogleDriveUrl } from '../../services/driveRepository';
 
 interface CulinarySouvenirFormModalProps {
   isOpen: boolean;
@@ -26,23 +42,33 @@ interface CulinarySouvenirFormModalProps {
   onSuccess: (savedItem: CulinarySouvenirItem) => void;
 }
 
-// Preset photo selections for rapid & beautiful input
-const PRESET_PHOTOS = {
-  KULINER: [
-    { label: 'Nasi Tutug Oncom', url: 'https://images.unsplash.com/photo-1626777552726-4a6b54c97e46?w=800&auto=format&fit=crop&q=80' },
-    { label: 'Asinan & Rujak', url: 'https://images.unsplash.com/photo-1540420773420-3366772f4999?w=800&auto=format&fit=crop&q=80' },
-    { label: 'Ayam Rempah / Betutu', url: 'https://images.unsplash.com/photo-1598515214211-89d3c73ae83b?w=800&auto=format&fit=crop&q=80' },
-    { label: 'Soto / Coto Rempah', url: 'https://images.unsplash.com/photo-1572656631137-7935297eff55?w=800&auto=format&fit=crop&q=80' },
-    { label: 'Kue Tradisional & Jajanan', url: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=800&auto=format&fit=crop&q=80' },
-    { label: 'Minuman Herbal & Jamu', url: 'https://images.unsplash.com/photo-1544787219-7f47ccb76574?w=800&auto=format&fit=crop&q=80' },
+// Preset photo selections across all 4 Krida categories
+const PRESET_PHOTOS_BY_KRIDA: Record<string, Array<{ label: string; url: string; category: KridaProductCategory; kind: ProductKind }>> = {
+  'Krida Pemandu': [
+    { label: 'Walking Tour Heritage & Kota Tua', url: 'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=800&auto=format&fit=crop&q=80', category: 'Pemanduan & Paket Wisata', kind: 'CINDERAMATA' },
+    { label: 'Pemanduan Ekowisata & Trekking Hutan', url: 'https://images.unsplash.com/photo-1501555088652-021faa106b9b?w=800&auto=format&fit=crop&q=80', category: 'Pemanduan & Paket Wisata', kind: 'CINDERAMATA' },
+    { label: 'Local Tour Guide Sejarah & Geopark', url: 'https://images.unsplash.com/photo-1527631746610-bca00a040d60?w=800&auto=format&fit=crop&q=80', category: 'Pemanduan & Paket Wisata', kind: 'CINDERAMATA' },
+    { label: 'Tur Susur Sungai & Eko Bahari', url: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800&auto=format&fit=crop&q=80', category: 'Pemanduan & Paket Wisata', kind: 'CINDERAMATA' },
   ],
-  CINDERAMATA: [
-    { label: 'Payung Geulis / Kriya Bambu', url: 'https://images.unsplash.com/photo-1513519245088-0e12902e5a38?w=800&auto=format&fit=crop&q=80' },
-    { label: 'Kain Tenun Ikat Daerah', url: 'https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?w=800&auto=format&fit=crop&q=80' },
-    { label: 'Batik Tulis & Cap Tradisional', url: 'https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=800&auto=format&fit=crop&q=80' },
-    { label: 'Anyaman Serat Alam & Noken', url: 'https://images.unsplash.com/photo-1544816155-12df9643f363?w=800&auto=format&fit=crop&q=80' },
-    { label: 'Ukiran Kayu & Topeng', url: 'https://images.unsplash.com/photo-1578925518470-4def7a0f08bb?w=800&auto=format&fit=crop&q=80' },
-    { label: 'Kerajinan Kulit & Manik', url: 'https://images.unsplash.com/photo-1590874103328-eac38a683ce7?w=800&auto=format&fit=crop&q=80' },
+  'Krida Penyuluh': [
+    { label: 'Jasa Dokumentasi & Drone Wisata', url: 'https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=800&auto=format&fit=crop&q=80', category: 'Fotografi & Media Wisata', kind: 'CINDERAMATA' },
+    { label: 'Fine Art Foto Lanskap & Kartu Pos', url: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=800&auto=format&fit=crop&q=80', category: 'Fotografi & Media Wisata', kind: 'CINDERAMATA' },
+    { label: 'Peta Panduan Saku & Buklet Wisata', url: 'https://images.unsplash.com/photo-1524654458049-e36be0721fa2?w=800&auto=format&fit=crop&q=80', category: 'Jasa & Edukasi Wisata', kind: 'CINDERAMATA' },
+    { label: 'Pelatihan Sapta Pesona & Edukasi Desa', url: 'https://images.unsplash.com/photo-1531482615713-2afd69097998?w=800&auto=format&fit=crop&q=80', category: 'Jasa & Edukasi Wisata', kind: 'CINDERAMATA' },
+  ],
+  'Krida Mice & Event': [
+    { label: 'Scout Camp & Glamping Edukasi', url: 'https://images.unsplash.com/photo-1504280390367-361c6d9f38f4?w=800&auto=format&fit=crop&q=80', category: 'MICE, Kemah & Atraksi', kind: 'CINDERAMATA' },
+    { label: 'Tiket Sanggar Seni & Tari Tradisional', url: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=800&auto=format&fit=crop&q=80', category: 'MICE, Kemah & Atraksi', kind: 'CINDERAMATA' },
+    { label: 'Paket Outbound & Team Building Saka', url: 'https://images.unsplash.com/photo-1526778548025-fa2f459cd5c1?w=800&auto=format&fit=crop&q=80', category: 'MICE, Kemah & Atraksi', kind: 'CINDERAMATA' },
+    { label: 'Festival Wisata & Expo Kreatif', url: 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=800&auto=format&fit=crop&q=80', category: 'MICE, Kemah & Atraksi', kind: 'CINDERAMATA' },
+  ],
+  'Krida Kuliner & Cinderamata': [
+    { label: 'Nasi Tutug Oncom & Masakan Tradisi', url: 'https://images.unsplash.com/photo-1626777552726-4a6b54c97e46?w=800&auto=format&fit=crop&q=80', category: 'Kuliner & Minuman Daerah', kind: 'KULINER' },
+    { label: 'Minuman Herbal Rempah & Jamu Khas', url: 'https://images.unsplash.com/photo-1544787219-7f47ccb76574?w=800&auto=format&fit=crop&q=80', category: 'Kuliner & Minuman Daerah', kind: 'KULINER' },
+    { label: 'Batik Tulis Motif Khas Daerah', url: 'https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=800&auto=format&fit=crop&q=80', category: 'Kriya & Cinderamata Khas', kind: 'CINDERAMATA' },
+    { label: 'Kriya Anyaman Bambu & Payung Geulis', url: 'https://images.unsplash.com/photo-1513519245088-0e12902e5a38?w=800&auto=format&fit=crop&q=80', category: 'Kriya & Cinderamata Khas', kind: 'CINDERAMATA' },
+    { label: 'Kain Tenun Ikat & Aksesoris Lokal', url: 'https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?w=800&auto=format&fit=crop&q=80', category: 'Kriya & Cinderamata Khas', kind: 'CINDERAMATA' },
+    { label: 'Kopi Robusta/Arabika Single Origin', url: 'https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?w=800&auto=format&fit=crop&q=80', category: 'Kuliner & Minuman Daerah', kind: 'KULINER' },
   ]
 };
 
@@ -57,6 +83,8 @@ export const CulinarySouvenirFormModal: React.FC<CulinarySouvenirFormModalProps>
   const currentMember = members.find(m => m.id === currentUser.memberId || m.userId === currentUser.id);
 
   // Form State
+  const [selectedKrida, setSelectedKrida] = useState<KridaType>('Krida Kuliner & Cinderamata');
+  const [kridaCategory, setKridaCategory] = useState<KridaProductCategory>('Kuliner & Minuman Daerah');
   const [kind, setKind] = useState<ProductKind>('KULINER');
   const [name, setName] = useState('');
   const [categoryLabel, setCategoryLabel] = useState('Makanan Tradisional Khas');
@@ -85,6 +113,8 @@ export const CulinarySouvenirFormModal: React.FC<CulinarySouvenirFormModalProps>
     if (!isOpen) return;
 
     if (editItem) {
+      setSelectedKrida(editItem.krida || 'Krida Kuliner & Cinderamata');
+      setKridaCategory(editItem.kridaCategory || 'Kuliner & Minuman Daerah');
       setKind(editItem.kind);
       setName(editItem.name);
       setCategoryLabel(editItem.categoryLabel);
@@ -102,23 +132,56 @@ export const CulinarySouvenirFormModal: React.FC<CulinarySouvenirFormModalProps>
       setDistrictId(editItem.districtId || '32.06.01');
       setGudepOrPangkalan(editItem.gudepOrPangkalan || '');
     } else {
-      // Default to Member's territory if available
+      const memberKrida = currentMember?.krida || 'Krida Kuliner & Cinderamata';
+      setSelectedKrida(memberKrida);
+      
+      let initCategory: KridaProductCategory = 'Kuliner & Minuman Daerah';
+      let initKind: ProductKind = 'KULINER';
+      let initUnit = 'per porsi';
+      let initPrice = 25000;
+      let initLabel = 'Makanan Tradisional Khas';
+
+      if (memberKrida === 'Krida Pemandu') {
+        initCategory = 'Pemanduan & Paket Wisata';
+        initKind = 'CINDERAMATA';
+        initUnit = 'per grup / trip';
+        initPrice = 150000;
+        initLabel = 'Jasa Pemanduan Wisata Sejarah & Alam';
+      } else if (memberKrida === 'Krida Penyuluh') {
+        initCategory = 'Fotografi & Media Wisata';
+        initKind = 'CINDERAMATA';
+        initUnit = 'per sesi foto';
+        initPrice = 200000;
+        initLabel = 'Dokumentasi & Travel Content';
+      } else if (memberKrida === 'Krida Mice & Event') {
+        initCategory = 'MICE, Kemah & Atraksi';
+        initKind = 'CINDERAMATA';
+        initUnit = 'per pax / tiket';
+        initPrice = 75000;
+        initLabel = 'Tiket Atraksi & Paket Edukasi Kemah';
+      }
+
+      setKridaCategory(initCategory);
+      setKind(initKind);
+      setName('');
+      setCategoryLabel(initLabel);
+      setDescription('');
+      setStoryOrigin('');
+      setPriceEstimate(initPrice);
+      setPriceUnit(initUnit);
+
+      const presets = PRESET_PHOTOS_BY_KRIDA[memberKrida] || PRESET_PHOTOS_BY_KRIDA['Krida Kuliner & Cinderamata'];
+      setImageUrl(presets[0]?.url || '');
+      
+      setUmkmName('');
+      setContactPhone(currentMember?.phone || '0812-3456-7890');
+      setAddress(currentMember?.address || '');
+      setTagInput('Khas Daerah, Karya Anggota Saka, Ramah Wisatawan');
+      
       const initProv = currentMember?.provinceId || (currentUser.jurisdictionId ? currentUser.jurisdictionId.split('.')[0] : '32');
       const initReg = currentMember?.regencyId || (currentUser.jurisdictionId?.length === 5 ? currentUser.jurisdictionId : '32.06');
       const initDist = currentMember?.districtId || '32.06.01';
 
-      setKind('KULINER');
-      setName('');
-      setCategoryLabel('Makanan Tradisional Khas');
-      setDescription('');
-      setStoryOrigin('');
-      setPriceEstimate(25000);
-      setPriceUnit('per porsi');
-      setImageUrl(PRESET_PHOTOS.KULINER[0].url);
-      setUmkmName('');
-      setContactPhone(currentMember?.phone || '0812-3456-7890');
-      setAddress(currentMember?.address || '');
-      setTagInput('Halal, Khas Daerah, UMKM Binaan Saka');
       setProvinceId(initProv);
       setRegencyId(initReg);
       setDistrictId(initDist);
@@ -150,18 +213,20 @@ export const CulinarySouvenirFormModal: React.FC<CulinarySouvenirFormModalProps>
   const currentRegObj = REGENCIES_DATA.find(r => r.id === regencyId);
   const currentDistObj = availableDistricts.find(d => d.id === districtId);
 
+  const isOperator = ['SUPER_ADMIN', 'ADMIN_PROVINCE', 'ADMIN_REGENCY', 'ADMIN_BRANCH'].includes(currentUser.role);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) {
-      alert('Mohon isi nama kuliner atau cinderamata khas daerah.');
+      alert('Mohon isi nama produk atau layanan karya anggota.');
       return;
     }
     if (!description.trim()) {
-      alert('Mohon isi deskripsi atau keunikan rasa/kriya.');
+      alert('Mohon isi rincian deskripsi produk atau spesifikasi layanan.');
       return;
     }
     if (!imageUrl.trim()) {
-      alert('Mohon sertakan tautan foto produk.');
+      alert('Mohon sertakan foto/media produk.');
       return;
     }
 
@@ -173,11 +238,13 @@ export const CulinarySouvenirFormModal: React.FC<CulinarySouvenirFormModalProps>
     const payload = {
       name: name.trim(),
       kind,
+      krida: selectedKrida,
+      kridaCategory,
       categoryLabel: categoryLabel.trim(),
       description: description.trim(),
       storyOrigin: storyOrigin.trim() || undefined,
       priceEstimate: Number(priceEstimate) || 0,
-      priceUnit: priceUnit.trim() || (kind === 'KULINER' ? 'per porsi' : 'per buah'),
+      priceUnit: priceUnit.trim() || 'per unit',
       imageUrl: imageUrl.trim(),
       provinceId,
       provinceName: currentProvObj?.name || 'Jawa Barat',
@@ -186,16 +253,16 @@ export const CulinarySouvenirFormModal: React.FC<CulinarySouvenirFormModalProps>
       districtId,
       districtName: currentDistObj ? `Kwarran ${currentDistObj.name}` : (currentMember?.branchName || 'Kwarran Ciawi'),
       gudepOrPangkalan: gudepOrPangkalan.trim() || undefined,
-      authorMemberId: currentMember?.id || currentUser.memberId || 'member-001',
+      authorMemberId: currentMember?.id || currentUser.memberId || currentUser.id,
       authorName: currentMember?.fullName || currentUser.name,
-      authorNta: currentMember?.nationalMemberNumber || '32.06.01.000001',
+      authorNta: currentMember?.nationalMemberNumber || '00.00.00.000001',
       authorAvatarUrl: currentMember?.avatarUrl || currentUser.avatarUrl,
-      authorRole: currentMember?.currentPosition || 'Anggota Saka Pariwisata',
+      authorRole: currentMember?.currentPosition || (isOperator ? 'Operator Wilayah' : 'Anggota Saka'),
       umkmName: umkmName.trim() || undefined,
       contactPhone: contactPhone.trim() || '0812-3456-7890',
       address: address.trim() || undefined,
-      tags: tags.length > 0 ? tags : ['Khas Daerah', 'Binaan Saka'],
-      status: 'PUBLISHED' as const
+      tags: tags.length > 0 ? tags : ['Khas Daerah', 'Karya Saka Pariwisata'],
+      status: editItem?.status || (isOperator ? 'APPROVED' : 'PENDING_APPROVAL')
     };
 
     if (editItem) {
@@ -216,21 +283,25 @@ export const CulinarySouvenirFormModal: React.FC<CulinarySouvenirFormModalProps>
       <div className="bg-white w-full max-w-3xl rounded-3xl shadow-2xl border border-slate-200 overflow-hidden my-6 max-h-[92vh] flex flex-col">
         
         {/* Header Modal */}
-        <div className="px-6 py-5 bg-gradient-to-r from-slate-900 via-purple-950 to-slate-900 text-white flex items-center justify-between flex-shrink-0 relative overflow-hidden">
+        <div className="px-6 py-5 bg-gradient-to-r from-slate-950 via-purple-950 to-indigo-950 text-white flex items-center justify-between flex-shrink-0 relative overflow-hidden">
           <div className="flex items-center gap-3.5 z-10">
-            <div className={`w-11 h-11 rounded-2xl flex items-center justify-center ${
-              kind === 'KULINER' ? 'bg-amber-500/20 text-amber-300 border border-amber-400/40' : 'bg-purple-500/20 text-purple-300 border border-purple-400/40'
-            }`}>
-              {kind === 'KULINER' ? <Utensils className="w-5 h-5" /> : <Gift className="w-5 h-5" />}
+            <div className="w-11 h-11 rounded-2xl bg-amber-500/20 text-amber-300 border border-amber-400/40 flex items-center justify-center">
+              <ShoppingBag className="w-5 h-5 text-amber-300" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 bg-white/10 rounded-full text-purple-200">
-                  Input Anggota Kwartir Ranting
+                <span className="text-[10px] uppercase font-bold tracking-wider px-2.5 py-0.5 bg-white/10 rounded-full text-purple-200">
+                  Etalase 4 Krida Saka Pariwisata
                 </span>
+                {!isOperator && (
+                  <span className="text-[10px] bg-amber-400/20 text-amber-200 border border-amber-400/30 px-2 py-0.5 rounded-full font-semibold flex items-center gap-1">
+                    <Clock className="w-2.5 h-2.5" />
+                    <span>Perlu Persetujuan Operator</span>
+                  </span>
+                )}
               </div>
-              <h3 className="text-lg font-bold font-heading text-white">
-                {editItem ? 'Edit Data Kuliner / Cinderamata' : 'Unggah Kuliner & Cinderamata Khas Daerah'}
+              <h3 className="text-lg font-bold font-heading text-white mt-0.5">
+                {editItem ? 'Edit Produk / Jasa Anggota' : 'Unggah Produk & Jasa Karya Anggota'}
               </h3>
             </div>
           </div>
@@ -243,68 +314,68 @@ export const CulinarySouvenirFormModal: React.FC<CulinarySouvenirFormModalProps>
           </button>
         </div>
 
+        {/* Notice for Member Submissions */}
+        {!isOperator && (
+          <div className="bg-purple-50/80 border-b border-purple-100 px-6 py-2.5 flex items-center gap-2 text-xs text-purple-900">
+            <ShieldCheck className="w-4 h-4 text-purple-600 flex-shrink-0" />
+            <span>
+              <strong>Alur Verifikasi:</strong> Produk yang Anda input akan masuk ke antrean persetujuan Operator Kwartir Wilayah setempat sebelum tayang di Galeri Nasional.
+            </span>
+          </div>
+        )}
+
         {/* Form Body (Scrollable) */}
         <form onSubmit={handleSubmit} className="p-6 overflow-y-auto custom-scrollbar flex-1 space-y-6">
           
-          {/* 1. Pilih Jenis Produk: Kuliner vs Cinderamata */}
+          {/* 1. Pilih 4 Krida Saka Pariwisata */}
           <div className="space-y-2">
-            <label className="text-xs font-bold uppercase tracking-wider text-slate-700">
-              Jenis Karya Khas Daerah <span className="text-rose-500">*</span>
+            <label className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center justify-between">
+              <span>Krida Saka Pariwisata <span className="text-rose-500">*</span></span>
+              <span className="text-[11px] font-normal text-slate-500">Pilih rumpun keahlian karya Anda</span>
             </label>
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                type="button"
-                onClick={() => {
-                  setKind('KULINER');
-                  if (!editItem) {
-                    setCategoryLabel('Makanan Tradisional Khas');
-                    setPriceUnit('per porsi');
-                    setImageUrl(PRESET_PHOTOS.KULINER[0].url);
-                  }
-                }}
-                className={`p-3.5 rounded-2xl border text-left flex items-center gap-3 transition-all cursor-pointer ${
-                  kind === 'KULINER'
-                    ? 'border-amber-500 bg-amber-50/70 ring-2 ring-amber-500/20'
-                    : 'border-slate-200 hover:border-slate-300 bg-slate-50/50'
-                }`}
-              >
-                <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${
-                  kind === 'KULINER' ? 'bg-amber-500 text-white' : 'bg-slate-200 text-slate-600'
-                }`}>
-                  <Utensils className="w-5 h-5" />
-                </div>
-                <div>
-                  <p className="text-xs font-bold text-slate-900">🍜 Kuliner & Makanan Khas</p>
-                  <p className="text-[11px] text-slate-500">Masakan tradisi, jajanan pasar, olahan rempah, minuman khas</p>
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setKind('CINDERAMATA');
-                  if (!editItem) {
-                    setCategoryLabel('Kriya & Kerajinan Tangan');
-                    setPriceUnit('per buah');
-                    setImageUrl(PRESET_PHOTOS.CINDERAMATA[0].url);
-                  }
-                }}
-                className={`p-3.5 rounded-2xl border text-left flex items-center gap-3 transition-all cursor-pointer ${
-                  kind === 'CINDERAMATA'
-                    ? 'border-purple-600 bg-purple-50/70 ring-2 ring-purple-600/20'
-                    : 'border-slate-200 hover:border-slate-300 bg-slate-50/50'
-                }`}
-              >
-                <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${
-                  kind === 'CINDERAMATA' ? 'bg-purple-600 text-white' : 'bg-slate-200 text-slate-600'
-                }`}>
-                  <Gift className="w-5 h-5" />
-                </div>
-                <div>
-                  <p className="text-xs font-bold text-slate-900">🎁 Cinderamata & Kriya Daerah</p>
-                  <p className="text-[11px] text-slate-500">Batik, tenun, anyaman bambu, ukiran kayu, kerajinan tangan</p>
-                </div>
-              </button>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+              {[
+                { krida: 'Krida Pemandu' as KridaType, icon: Compass, title: 'Krida Pemandu', desc: 'Tour & Local Guide', color: 'border-blue-500 bg-blue-50/60 text-blue-900', defCat: 'Pemanduan & Paket Wisata' as KridaProductCategory, defKind: 'CINDERAMATA' as ProductKind, defUnit: 'per trip', defLabel: 'Pemanduan Wisata Lokal' },
+                { krida: 'Krida Penyuluh' as KridaType, icon: Camera, title: 'Krida Penyuluh', desc: 'Foto, Video & Media', color: 'border-emerald-500 bg-emerald-50/60 text-emerald-900', defCat: 'Fotografi & Media Wisata' as KridaProductCategory, defKind: 'CINDERAMATA' as ProductKind, defUnit: 'per sesi', defLabel: 'Jasa Dokumentasi Wisata' },
+                { krida: 'Krida Mice & Event' as KridaType, icon: Tent, title: 'Krida MICE', desc: 'Kemah & Atraksi', color: 'border-orange-500 bg-orange-50/60 text-orange-900', defCat: 'MICE, Kemah & Atraksi' as KridaProductCategory, defKind: 'CINDERAMATA' as ProductKind, defUnit: 'per tiket/pax', defLabel: 'Paket Kemah & Pertunjukan' },
+                { krida: 'Krida Kuliner & Cinderamata' as KridaType, icon: Utensils, title: 'Kuliner & Kriya', desc: 'Makanan & Suvenir', color: 'border-amber-500 bg-amber-50/60 text-amber-900', defCat: 'Kuliner & Minuman Daerah' as KridaProductCategory, defKind: 'KULINER' as ProductKind, defUnit: 'per porsi/pcs', defLabel: 'Makanan Tradisional Khas' },
+              ].map(kItem => {
+                const Icon = kItem.icon;
+                const isSelected = selectedKrida === kItem.krida;
+                return (
+                  <button
+                    type="button"
+                    key={kItem.krida}
+                    onClick={() => {
+                      setSelectedKrida(kItem.krida);
+                      setKridaCategory(kItem.defCat);
+                      setKind(kItem.defKind);
+                      setPriceUnit(kItem.defUnit);
+                      setCategoryLabel(kItem.defLabel);
+                      const presets = PRESET_PHOTOS_BY_KRIDA[kItem.krida];
+                      if (presets && presets.length > 0) {
+                        setImageUrl(presets[0].url);
+                      }
+                    }}
+                    className={`p-3 rounded-2xl border text-left flex flex-col justify-between gap-2 transition-all cursor-pointer ${
+                      isSelected
+                        ? `ring-2 ring-purple-600 border-purple-600 bg-purple-50/80`
+                        : 'border-slate-200 hover:border-slate-300 bg-slate-50/40'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${isSelected ? 'bg-purple-700 text-white' : 'bg-slate-200 text-slate-600'}`}>
+                        <Icon className="w-4 h-4" />
+                      </div>
+                      {isSelected && <CheckCircle className="w-4 h-4 text-purple-700" />}
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-slate-900 leading-tight">{kItem.title}</p>
+                      <p className="text-[10px] text-slate-500 mt-0.5 leading-tight">{kItem.desc}</p>
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           </div>
 
@@ -312,14 +383,19 @@ export const CulinarySouvenirFormModal: React.FC<CulinarySouvenirFormModalProps>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="md:col-span-2 space-y-1.5">
               <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                <span>Nama Kuliner / Cinderamata Khas</span>
+                <span>Nama Produk, Jasa, atau Karya Wisata</span>
                 <span className="text-rose-500">*</span>
               </label>
               <input
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder={kind === 'KULINER' ? 'Contoh: Nasi Tutug Oncom & Sambal Goang' : 'Contoh: Payung Geulis Lukis Bambu'}
+                placeholder={
+                  selectedKrida === 'Krida Pemandu' ? 'Contoh: Walking Tour Sejarah Kota Tua & Cagar Budaya' :
+                  selectedKrida === 'Krida Penyuluh' ? 'Contoh: Sesi Dokumentasi Drone & Travel Photography' :
+                  selectedKrida === 'Krida Mice & Event' ? 'Contoh: Paket Edukasi Kemah Scout Glamping Pine Forest' :
+                  'Contoh: Nasi Tutug Oncom Khas / Batik Tulis Pewarna Alami'
+                }
                 className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm focus:bg-white focus:border-purple-600 focus:ring-2 focus:ring-purple-600/20 outline-none transition-all font-semibold"
                 required
               />
@@ -329,36 +405,19 @@ export const CulinarySouvenirFormModal: React.FC<CulinarySouvenirFormModalProps>
               <label className="text-xs font-bold text-slate-700">
                 Kategori Spesifik
               </label>
-              <select
+              <input
+                type="text"
                 value={categoryLabel}
                 onChange={(e) => setCategoryLabel(e.target.value)}
+                placeholder="Contoh: Tur Bersejarah / Makanan Tradisional / Kriya Bambu"
                 className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:bg-white focus:border-purple-600 outline-none"
-              >
-                {kind === 'KULINER' ? (
-                  <>
-                    <option value="Makanan Tradisional Khas">Makanan Tradisional Khas</option>
-                    <option value="Jajanan Pasar & Camilan">Jajanan Pasar & Camilan</option>
-                    <option value="Kuliner Rempah Tradisional">Kuliner Rempah Tradisional</option>
-                    <option value="Minuman Tradisional & Herbal">Minuman Tradisional & Herbal</option>
-                    <option value="Oleh-oleh Olahan Makanan">Oleh-oleh Olahan Makanan</option>
-                  </>
-                ) : (
-                  <>
-                    <option value="Kriya & Kerajinan Tangan Tradisional">Kriya & Kerajinan Tangan Tradisional</option>
-                    <option value="Batik Tulis & Cap Daerah">Batik Tulis & Cap Daerah</option>
-                    <option value="Kain Tenun Tradisional">Kain Tenun Tradisional</option>
-                    <option value="Anyaman Serat Alam & Bambu">Anyaman Serat Alam & Bambu</option>
-                    <option value="Kriya Ukir Kayu Nusantara">Kriya Ukir Kayu Nusantara</option>
-                    <option value="Aksesoris & Suvenir Khas">Aksesoris & Suvenir Khas</option>
-                  </>
-                )}
-              </select>
+              />
             </div>
 
             <div className="grid grid-cols-2 gap-2">
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-slate-700">
-                  Estimasi Harga (Rp)
+                  Estimasi Biaya / Harga (Rp)
                 </label>
                 <input
                   type="number"
@@ -370,13 +429,13 @@ export const CulinarySouvenirFormModal: React.FC<CulinarySouvenirFormModalProps>
               </div>
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-slate-700">
-                  Satuan
+                  Satuan Harga
                 </label>
                 <input
                   type="text"
                   value={priceUnit}
                   onChange={(e) => setPriceUnit(e.target.value)}
-                  placeholder="per porsi / per pcs"
+                  placeholder="per porsi / per pax / per trip / per pcs"
                   className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:bg-white focus:border-purple-600 outline-none"
                 />
               </div>
@@ -388,7 +447,7 @@ export const CulinarySouvenirFormModal: React.FC<CulinarySouvenirFormModalProps>
             <div className="flex items-center gap-2 text-slate-800">
               <MapPin className="w-4 h-4 text-purple-600" />
               <span className="text-xs font-bold uppercase tracking-wider">
-                Lokasi Asal Kwartir Ranting (Kwarran)
+                Wilayah Pangkalan / Kwartir Ranting Asal
               </span>
             </div>
 
@@ -434,7 +493,7 @@ export const CulinarySouvenirFormModal: React.FC<CulinarySouvenirFormModalProps>
             </div>
 
             <div>
-              <label className="text-[11px] font-semibold text-slate-600 block mb-1">Gugus Depan / Pangkalan Penginput</label>
+              <label className="text-[11px] font-semibold text-slate-600 block mb-1">Pangkalan / Gugus Depan Penginput</label>
               <input
                 type="text"
                 value={gudepOrPangkalan}
@@ -450,15 +509,24 @@ export const CulinarySouvenirFormModal: React.FC<CulinarySouvenirFormModalProps>
             <div className="flex items-center justify-between">
               <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
                 <ImageIcon className="w-3.5 h-3.5 text-purple-600" />
-                <span>Foto Produk / Kuliner</span>
+                <span>Foto Produk / Portofolio Jasa</span>
                 <span className="text-rose-500">*</span>
               </label>
-              <span className="text-[11px] text-slate-400">Pilih preset atau masukkan URL foto</span>
+              <a
+                href={GOOGLE_DRIVE_MAIN_FOLDER.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[11px] text-purple-700 hover:text-purple-900 font-bold flex items-center gap-1"
+              >
+                <FolderOpen className="w-3 h-3 text-purple-600" />
+                <span>Google Drive Repositori</span>
+                <ExternalLink className="w-2.5 h-2.5" />
+              </a>
             </div>
 
-            {/* Quick Preset Selector */}
-            <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
-              {(kind === 'KULINER' ? PRESET_PHOTOS.KULINER : PRESET_PHOTOS.CINDERAMATA).map((item, idx) => (
+            {/* Quick Preset Selector for the chosen Krida */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {(PRESET_PHOTOS_BY_KRIDA[selectedKrida] || PRESET_PHOTOS_BY_KRIDA['Krida Kuliner & Cinderamata']).map((item, idx) => (
                 <button
                   type="button"
                   key={idx}
@@ -468,7 +536,7 @@ export const CulinarySouvenirFormModal: React.FC<CulinarySouvenirFormModalProps>
                   }`}
                 >
                   <img src={item.url} alt={item.label} className="w-full h-full object-cover" />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent flex items-end p-1.5">
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-transparent flex items-end p-1.5">
                     <span className="text-[9px] font-bold text-white leading-tight line-clamp-1">{item.label}</span>
                   </div>
                   {imageUrl === item.url && (
@@ -484,28 +552,28 @@ export const CulinarySouvenirFormModal: React.FC<CulinarySouvenirFormModalProps>
               <input
                 type="url"
                 value={imageUrl}
-                onChange={(e) => setImageUrl(e.target.value)}
-                placeholder="https://images.unsplash.com/..."
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setImageUrl(formatGoogleDriveUrl(val));
+                }}
+                placeholder="Tempel tautan Google Drive atau URL foto (e.g. https://drive.google.com/file/d/...)"
                 className="flex-1 px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:bg-white focus:border-purple-600"
                 required
               />
             </div>
           </div>
 
-          {/* 5. Deskripsi & Cerita Asal-Usul */}
+          {/* 5. Deskripsi & Filosofi/Fasilitas */}
           <div className="space-y-4">
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-slate-700">
-                Deskripsi Cita Rasa / Bahan / Keunikan <span className="text-rose-500">*</span>
+                Deskripsi Lengkap / Rincian Layanan / Spesifikasi <span className="text-rose-500">*</span>
               </label>
               <textarea
                 rows={3}
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder={kind === 'KULINER' 
-                  ? 'Jelaskan cita rasa, komposisi rempah, bumbu rahasia, tekstur, dan kelezatan hidangan ini...' 
-                  : 'Jelaskan bahan alami yang digunakan, teknik pembuatan tangan, dan fungsi cinderamata ini...'
-                }
+                placeholder="Jelaskan fasilitas yang termasuk, keunggulan, cita rasa bahan, durasi pemanduan, atau nilai tambah produk..."
                 className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:bg-white focus:border-purple-600 outline-none leading-relaxed"
                 required
               />
@@ -514,31 +582,31 @@ export const CulinarySouvenirFormModal: React.FC<CulinarySouvenirFormModalProps>
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
                 <BookOpen className="w-3.5 h-3.5 text-amber-600" />
-                <span>Sejarah, Filosofi Budaya, atau Asal-Usul Khas Daerah</span>
+                <span>Sejarah, Filosofi Budaya, atau Nilai Kearifan Lokal</span>
                 <span className="text-[11px] font-normal text-slate-400">(Opsional)</span>
               </label>
               <textarea
                 rows={2}
                 value={storyOrigin}
                 onChange={(e) => setStoryOrigin(e.target.value)}
-                placeholder="Ceritakan latar belakang sejarah, tradisi leluhur, atau nilai kearifan lokal yang terkandung..."
+                placeholder="Ceritakan latar belakang sejarah tradisi, filosofi motif kriya, atau keunikan destinasi lokal..."
                 className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:bg-white focus:border-purple-600 outline-none leading-relaxed"
               />
             </div>
           </div>
 
-          {/* 6. Info Pengrajin / UMKM & Kontak Pemesanan */}
+          {/* 6. Info Sentra / UMKM & WhatsApp Transaksi */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-slate-100">
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-slate-700 flex items-center gap-1">
                 <Store className="w-3.5 h-3.5 text-slate-500" />
-                <span>Nama UMKM / Pengrajin / Dapur Binaan</span>
+                <span>Nama Sentra UMKM / Pangkalan Saka / Brand</span>
               </label>
               <input
                 type="text"
                 value={umkmName}
                 onChange={(e) => setUmkmName(e.target.value)}
-                placeholder="Contoh: Dapur Warisan Binaan Saka"
+                placeholder="Contoh: Unit Usaha Mandiri Krida Saka"
                 className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none"
               />
             </div>
@@ -546,7 +614,7 @@ export const CulinarySouvenirFormModal: React.FC<CulinarySouvenirFormModalProps>
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-slate-700 flex items-center gap-1">
                 <Phone className="w-3.5 h-3.5 text-emerald-600" />
-                <span>WhatsApp Pemesanan / Info</span>
+                <span>WhatsApp Kontak Pemesanan Pengunjung</span>
               </label>
               <input
                 type="text"
@@ -560,13 +628,13 @@ export const CulinarySouvenirFormModal: React.FC<CulinarySouvenirFormModalProps>
             <div className="sm:col-span-2 space-y-1.5">
               <label className="text-xs font-bold text-slate-700 flex items-center gap-1">
                 <Tag className="w-3.5 h-3.5 text-slate-500" />
-                <span>Label / Tagar (Pisahkan dengan koma)</span>
+                <span>Tagar / Label Pencarian</span>
               </label>
               <input
                 type="text"
                 value={tagInput}
                 onChange={(e) => setTagInput(e.target.value)}
-                placeholder="Halal, Khas Sunda, Warisan Budaya, Oleh-oleh"
+                placeholder="Pemanduan, Ekowisata, Suvenir Lokal, Halal, Karya Saka"
                 className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none"
               />
             </div>
@@ -576,7 +644,7 @@ export const CulinarySouvenirFormModal: React.FC<CulinarySouvenirFormModalProps>
         {/* Modal Footer */}
         <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between flex-shrink-0">
           <div className="text-[11px] text-slate-500">
-            Diinput oleh: <strong className="text-slate-800">{currentMember?.fullName || currentUser.name}</strong>
+            Kreator: <strong className="text-slate-800">{currentMember?.fullName || currentUser.name}</strong> ({selectedKrida})
           </div>
 
           <div className="flex items-center gap-2">
@@ -594,7 +662,13 @@ export const CulinarySouvenirFormModal: React.FC<CulinarySouvenirFormModalProps>
               className="px-6 py-2 text-xs font-bold text-white bg-gradient-to-r from-purple-700 to-indigo-600 hover:from-purple-600 hover:to-indigo-500 rounded-xl shadow-md shadow-purple-950/20 active:scale-95 transition-all cursor-pointer flex items-center gap-2"
             >
               <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-              <span>{editItem ? 'Simpan Perubahan' : 'Terbitkan ke Galeri'}</span>
+              <span>
+                {editItem 
+                  ? 'Simpan Perubahan' 
+                  : isOperator 
+                    ? 'Terbitkan Langsung ke Galeri' 
+                    : 'Ajukan ke Operator Wilayah'}
+              </span>
             </button>
           </div>
         </div>

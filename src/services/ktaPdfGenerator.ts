@@ -381,10 +381,10 @@ async function renderFrontCardCanvas(
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
-  // 2b. Custom Background Artwork Image (90% Opacity)
+  // 2b. Custom Background Artwork Image (10% Default Opacity)
   if (bgImg && (bgImg.naturalWidth > 0 || bgImg.width > 0)) {
     ctx.save();
-    ctx.globalAlpha = settings.bgOpacity ?? 0.90;
+    ctx.globalAlpha = settings.bgOpacity ?? 0.10;
     ctx.drawImage(bgImg, 0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
     ctx.restore();
   }
@@ -653,10 +653,10 @@ async function renderBackCardCanvas(
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
-  // 2b. Custom Background Artwork Image (90% Opacity)
+  // 2b. Custom Background Artwork Image (10% Default Opacity)
   if (bgImg && (bgImg.naturalWidth > 0 || bgImg.width > 0)) {
     ctx.save();
-    ctx.globalAlpha = (settings.bgOpacity ?? 0.90) * 0.85;
+    ctx.globalAlpha = (settings.bgOpacity ?? 0.10) * 0.85;
     ctx.drawImage(bgImg, 0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
     ctx.restore();
   }
@@ -793,7 +793,7 @@ async function renderBackCardCanvas(
   // Signer Name & Title
   ctx.fillStyle = '#ffffff';
   ctx.font = 'bold 16px "Inter", sans-serif';
-  ctx.fillText(settings.signerName || 'Reza Pahlevi', centerSignX, 564);
+  ctx.fillText(settings.signerName || 'Rohadi Wijaya', centerSignX, 564);
 
   ctx.fillStyle = theme.accent;
   ctx.font = 'bold 12px "Inter", sans-serif';
@@ -824,9 +824,8 @@ export async function generateKtaPdf({
 }: GenerateKtaOptions): Promise<jsPDF> {
   if (onProgress) onProgress('Mempersiapkan data dan aset KTA...');
 
-  const verificationUrl = `${window.location.origin}/verify/${
-    member.nationalMemberNumber || member.verificationToken || member.id
-  }`;
+  const nta = member.nationalMemberNumber || member.verificationToken || member.id;
+  const verificationUrl = `${window.location.origin}/?verifyId=${encodeURIComponent(nta)}&tab=verify-portal`;
 
   const [qrDataUrl, avatarImg, logoImg, bgImg] = await Promise.all([
     generateQrDataUrl(verificationUrl),

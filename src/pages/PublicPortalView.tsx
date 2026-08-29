@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   ShieldCheck, 
   Search, 
@@ -26,6 +26,8 @@ import { Member, TourPackage, Skill } from '../types';
 import { TourPackageCard } from '../components/tourism/TourPackageCard';
 import { SakaLogo } from '../components/common/SakaLogo';
 import { MASTER_SKILLS } from '../data/initialData';
+import { IntegratedTourismShowcaseGallery } from '../components/dashboard/IntegratedTourismShowcaseGallery';
+import { storage } from '../services/storage';
 
 interface PublicPortalViewProps {
   members: Member[];
@@ -59,6 +61,33 @@ export const PublicPortalView: React.FC<PublicPortalViewProps> = ({
   const [talentSearchQuery, setTalentSearchQuery] = useState<string>('');
   const [talentCategoryFilter, setTalentCategoryFilter] = useState<string>('ALL');
   const [talentSkillFilter, setTalentSkillFilter] = useState<string>('ALL');
+
+  // Auto-check URL parameters on mount
+  useEffect(() => {
+    try {
+      const urlParams = new URLSearchParams(window.location.search);
+      const urlVerifyId = urlParams.get('verifyId') || urlParams.get('nta') || urlParams.get('id');
+      if (urlVerifyId) {
+        const term = urlVerifyId.trim();
+        setVerifyInput(term);
+        const termLower = term.toLowerCase();
+        const found = members.find(m => 
+          (m.nationalMemberNumber && m.nationalMemberNumber.toLowerCase() === termLower) ||
+          (m.verificationToken && m.verificationToken.toLowerCase() === termLower) ||
+          (m.id && m.id.toLowerCase() === termLower) ||
+          (m.fullName && m.fullName.toLowerCase() === termLower)
+        );
+        if (found) {
+          setSearchedMember(found);
+          setNotFound(false);
+        } else {
+          setNotFound(true);
+        }
+      }
+    } catch (e) {
+      console.warn('URL verify param error', e);
+    }
+  }, [members]);
 
   // Verify Handler
   const handleVerify = (e: React.FormEvent) => {
@@ -286,6 +315,26 @@ export const PublicPortalView: React.FC<PublicPortalViewProps> = ({
           </div>
         </div>
       </div>
+
+      {/* 2.5 GALERI TERPADU CERDAS SAKA PARIWISATA: Destinasi, Produk 4 Krida & Rekomendasi Pemandu Wilayah */}
+      <section id="galeri-unggulan" className="scroll-mt-6">
+        <IntegratedTourismShowcaseGallery
+          tours={tours}
+          products={storage.getCulinarySouvenirs()}
+          members={members}
+          currentUser={{
+            id: 'public-guest',
+            username: 'wisatawan',
+            email: 'wisatawan@publik.id',
+            name: 'Wisatawan Nusantara',
+            role: 'MEMBER',
+            jurisdictionName: 'Publik'
+          }}
+          onViewTourDetail={onViewTourDetail}
+          onSelectMember={onOpenVerifyModal}
+          onSelectTab={onSelectTab}
+        />
+      </section>
 
       {/* 3. SECTION 1: PAKET WISATA KOMUNITAS */}
       <section id="paket-wisata" className="space-y-6 pt-4 scroll-mt-6">

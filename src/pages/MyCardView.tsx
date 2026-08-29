@@ -94,13 +94,14 @@ export const MyCardView: React.FC<MyCardViewProps> = ({
             </button>
           )}
 
-          {isAdmin && onOpenEditPhotoModal && (
+          {onOpenEditPhotoModal && (
             <button
               onClick={() => onOpenEditPhotoModal(member)}
               className="flex-shrink-0 px-4 py-2.5 bg-white hover:bg-slate-50 text-slate-800 border border-slate-200 rounded-2xl text-xs font-bold shadow-xs transition-all inline-flex items-center gap-2 cursor-pointer"
+              title="Unggah berkas atau ganti link pas foto resmi KTA Anda"
             >
               <Camera className="w-4 h-4 text-purple-600" />
-              <span>Perbaiki Foto</span>
+              <span>Ubah Foto KTA</span>
             </button>
           )}
 
@@ -122,7 +123,7 @@ export const MyCardView: React.FC<MyCardViewProps> = ({
           member={member}
           onVerifyClick={onOpenVerifyModal}
           onEditCard={isAdmin ? onOpenEditCardModal : undefined}
-          onEditPhoto={isAdmin && onOpenEditPhotoModal ? () => onOpenEditPhotoModal(member) : undefined}
+          onEditPhoto={onOpenEditPhotoModal ? () => onOpenEditPhotoModal(member) : undefined}
           onEditMemberProfile={isAdmin && onOpenEditMemberModal ? () => onOpenEditMemberModal(member) : undefined}
           onPrintPdf={onOpenPrintPdfModal ? () => onOpenPrintPdfModal(member) : undefined}
           showControls={true}

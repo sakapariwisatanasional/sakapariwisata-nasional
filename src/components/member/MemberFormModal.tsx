@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   X, 
   UserPlus, 
@@ -11,9 +11,12 @@ import {
   Sparkles,
   ShieldCheck,
   Lock,
-  AlertCircle
+  AlertCircle,
+  Upload,
+  Link as LinkIcon
 } from 'lucide-react';
 import { storage } from '../../services/storage';
+import { formatGoogleDriveUrl } from '../../services/driveRepository';
 import { Province, Regency, District, Branch, Skill, MemberSkill, SkillProficiency, KridaType, CurrentUser } from '../../types';
 
 interface MemberFormModalProps {
@@ -57,6 +60,29 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
   const [occupation, setOccupation] = useState('Pelajar / Mahasiswa');
   const [bio, setBio] = useState('');
   const [avatarUrl, setAvatarUrl] = useState('https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop&q=80');
+  const [photoInputUrl, setPhotoInputUrl] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handlePhotoFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (!file.type.startsWith('image/')) {
+        alert('Mohon pilih file gambar yang valid (JPG, PNG, WEBP).');
+        return;
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        alert('Ukuran file foto maksimal 5MB.');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        if (event.target?.result) {
+          setAvatarUrl(event.target.result as string);
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   // Selected Skills
   const [selectedSkillIds, setSelectedSkillIds] = useState<string[]>(['skill-tour-guide']);
@@ -378,28 +404,85 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
               </div>
             </div>
 
-            {/* Avatar Picker */}
-            <div>
-              <label className="block font-semibold text-slate-700 mb-1.5">Foto Profil Anggota (KTA)</label>
-              <div className="flex items-center gap-3">
-                <img
-                  src={avatarUrl}
-                  alt="Preview"
-                  className="w-12 h-14 object-cover rounded-xl border-2 border-emerald-500 shadow-sm"
-                />
-                <div className="flex gap-2">
-                  {sampleAvatars.map((url, i) => (
+            {/* Avatar Picker with Upload and URL Support */}
+            <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 space-y-3">
+              <div className="flex items-center justify-between">
+                <label className="block text-xs font-bold text-slate-800">Foto Resmi KTA Anggota</label>
+                <span className="text-[10px] text-slate-500">Mendukung upload file, link Drive/Web, atau sampel</span>
+              </div>
+              <div className="flex items-start gap-4">
+                <div className="relative group flex-shrink-0">
+                  <img
+                    src={avatarUrl}
+                    alt="Preview"
+                    className="w-16 h-20 object-cover rounded-xl border-2 border-emerald-500 shadow-md bg-slate-800"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="absolute inset-0 bg-slate-900/60 opacity-0 group-hover:opacity-100 rounded-xl flex flex-col items-center justify-center text-white transition-opacity cursor-pointer"
+                  >
+                    <Camera className="w-4 h-4 mb-0.5 text-emerald-300" />
+                    <span className="text-[8px] font-bold">Ganti</span>
+                  </button>
+                </div>
+                
+                <div className="flex-1 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handlePhotoFileUpload}
+                      className="hidden"
+                    />
                     <button
                       type="button"
-                      key={i}
-                      onClick={() => setAvatarUrl(url)}
-                      className={`w-9 h-9 rounded-lg overflow-hidden border-2 transition-all cursor-pointer ${
-                        avatarUrl === url ? 'border-emerald-600 scale-105 shadow-sm' : 'border-transparent opacity-60 hover:opacity-100'
-                      }`}
+                      onClick={() => fileInputRef.current?.click()}
+                      className="px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
                     >
-                      <img src={url} alt="Option" className="w-full h-full object-cover" />
+                      <Upload className="w-3.5 h-3.5" />
+                      <span>Upload Berkas Foto</span>
                     </button>
-                  ))}
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <div className="relative flex-1">
+                      <LinkIcon className="w-3 h-3 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="url"
+                        value={photoInputUrl}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setPhotoInputUrl(val);
+                          if (val.trim()) {
+                            setAvatarUrl(formatGoogleDriveUrl(val.trim()));
+                          }
+                        }}
+                        placeholder="Tempel link foto Google Drive / Web..."
+                        className="w-full pl-7 pr-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs text-slate-800 outline-none focus:ring-1 focus:ring-emerald-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 pt-0.5">
+                    <span className="text-[10px] text-slate-500 mr-1">Sampel:</span>
+                    {sampleAvatars.map((url, i) => (
+                      <button
+                        type="button"
+                        key={i}
+                        onClick={() => {
+                          setAvatarUrl(url);
+                          setPhotoInputUrl('');
+                        }}
+                        className={`w-7 h-7 rounded-lg overflow-hidden border-2 transition-all cursor-pointer ${
+                          avatarUrl === url ? 'border-emerald-600 scale-105 shadow-xs' : 'border-transparent opacity-60 hover:opacity-100'
+                        }`}
+                      >
+                        <img src={url} alt="Option" className="w-full h-full object-cover" />
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>

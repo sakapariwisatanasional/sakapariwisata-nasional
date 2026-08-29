@@ -15,7 +15,8 @@ import {
   TourStatus,
   SkillProficiency,
   KtaCardSettings,
-  CulinarySouvenirItem
+  CulinarySouvenirItem,
+  ProductModerationStatus
 } from '../types';
 import { PROVINCES_DATA, REGENCIES_DATA, DISTRICTS_DATA, BRANCHES_DATA, getDistrictsForRegency } from '../data/indonesiaTerritories';
 import { 
@@ -32,7 +33,7 @@ import { SAKA_CARD_BG_DRIVE_DIRECT_URL } from '../components/common/SakaLogo';
 export const DEFAULT_KTA_SETTINGS: KtaCardSettings = {
   cardTheme: 'purple_saka',
   bgImageUrl: SAKA_CARD_BG_DRIVE_DIRECT_URL,
-  bgOpacity: 0.90,
+  bgOpacity: 0.10,
   frontOrganizationTitle: 'SAKA PARIWISATA',
   frontOrganizationSubtitle: 'GERAKAN PRAMUKA INDONESIA',
   frontValidityText: 'Masa Berlaku: Selama Menjadi Anggota',
@@ -48,22 +49,22 @@ export const DEFAULT_KTA_SETTINGS: KtaCardSettings = {
   ],
   issueLocationDate: 'Jakarta, 14 Agustus 2026',
   barcodeType: 'CODE128',
-  signerName: 'Reza Pahlevi',
+  signerName: 'Rohadi Wijaya',
   signerTitle: 'Ketua Pimpinan Saka Pariwisata Nasional',
   showStamp: true
 };
 
 const STORAGE_KEYS = {
-  MEMBERS: 'saka_members_v1',
-  TOURS: 'saka_tours_v1',
-  ACTIVITIES: 'saka_activities_v1',
-  AUDIT_LOGS: 'saka_audit_logs_v1',
-  NOTIFICATIONS: 'saka_notifications_v1',
-  CURRENT_USER: 'saka_current_user_v1',
-  USERS: 'saka_users_v1',
-  CUSTOM_BRANCHES: 'saka_custom_branches_v1',
-  KTA_SETTINGS: 'saka_kta_settings_v1',
-  CULINARY_SOUVENIRS: 'saka_culinary_souvenirs_v1'
+  MEMBERS: 'saka_members_v2',
+  TOURS: 'saka_tours_v2',
+  ACTIVITIES: 'saka_activities_v2',
+  AUDIT_LOGS: 'saka_audit_logs_v2',
+  NOTIFICATIONS: 'saka_notifications_v2',
+  CURRENT_USER: 'saka_current_user_v2',
+  USERS: 'saka_users_v2',
+  CUSTOM_BRANCHES: 'saka_custom_branches_v2',
+  KTA_SETTINGS: 'saka_kta_settings_v2',
+  CULINARY_SOUVENIRS: 'saka_culinary_souvenirs_v2'
 };
 
 class StorageService {
@@ -74,37 +75,23 @@ class StorageService {
   }
 
   private init() {
-    const rawMembers = localStorage.getItem(STORAGE_KEYS.MEMBERS);
-    if (!rawMembers) {
+    // Bersihkan data lama v1 jika ada
+    const legacyKeys = [
+      'saka_members_v1',
+      'saka_tours_v1',
+      'saka_activities_v1',
+      'saka_audit_logs_v1',
+      'saka_notifications_v1',
+      'saka_current_user_v1',
+      'saka_users_v1',
+      'saka_custom_branches_v1',
+      'saka_kta_settings_v1',
+      'saka_culinary_souvenirs_v1'
+    ];
+    legacyKeys.forEach(k => localStorage.removeItem(k));
+
+    if (!localStorage.getItem(STORAGE_KEYS.MEMBERS)) {
       localStorage.setItem(STORAGE_KEYS.MEMBERS, JSON.stringify(INITIAL_MEMBERS));
-    } else {
-      // Migrate any legacy Krida values in localStorage
-      try {
-        const parsed: Member[] = JSON.parse(rawMembers);
-        let changed = false;
-        const kridaMap: Record<string, any> = {
-          'Bina Pemandu Wisata': 'Krida Pemandu',
-          'Bina Objek Wisata': 'Krida Penyuluh',
-          'Bina Atraksi Wisata': 'Krida Mice & Event',
-          'Bina Kuliner & Cendramata': 'Krida Kuliner & Cinderamata'
-        };
-        const migrated = parsed.map(m => {
-          if (m.krida && kridaMap[m.krida]) {
-            changed = true;
-            return {
-              ...m,
-              krida: kridaMap[m.krida],
-              currentPosition: m.currentPosition?.replace(/Bina Pemandu Wisata|Bina Objek Wisata|Bina Atraksi Wisata|Bina Kuliner & Cendramata/g, (match) => kridaMap[match] || match)
-            };
-          }
-          return m;
-        });
-        if (changed) {
-          localStorage.setItem(STORAGE_KEYS.MEMBERS, JSON.stringify(migrated));
-        }
-      } catch (e) {
-        console.error('Failed to migrate legacy members', e);
-      }
     }
     if (!localStorage.getItem(STORAGE_KEYS.TOURS)) {
       localStorage.setItem(STORAGE_KEYS.TOURS, JSON.stringify(INITIAL_TOUR_PACKAGES));
@@ -120,13 +107,14 @@ class StorageService {
     } else {
       try {
         const rawUser = localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
-        if (rawUser && rawUser.includes('Suryadi')) {
-          const user: CurrentUser = JSON.parse(rawUser);
-          user.name = user.name.replace(/Dr\.\s*H\.\s*Suryadi,\s*M\.M\.|Suryadi/g, 'Reza Pahlevi');
-          localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(user));
+        if (rawUser) {
+          const u: CurrentUser = JSON.parse(rawUser);
+          if (u.role === 'SUPER_ADMIN' || u.name.includes('Reza') || u.name.includes('Suryadi')) {
+            localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(DEMO_USERS[0]));
+          }
         }
       } catch (e) {
-        console.error('Failed to migrate user name', e);
+        localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(DEMO_USERS[0]));
       }
     }
     if (!localStorage.getItem(STORAGE_KEYS.USERS)) {
@@ -135,24 +123,14 @@ class StorageService {
     if (!localStorage.getItem(STORAGE_KEYS.NOTIFICATIONS)) {
       const initialNotifs: NotificationItem[] = [
         {
-          id: 'notif-1',
-          userId: 'user-admin-nasional',
-          title: 'Pendaftaran Anggota Baru',
-          message: 'Fikri Haikal telah mendaftar di Kwarran Coblong Bandung dan membutuhkan verifikasi.',
+          id: 'notif-welcome',
+          userId: 'user-superadmin-rohadi',
+          title: 'Selamat Datang Super Admin Rohadi Wijaya',
+          message: 'Sistem Informasi Manajemen Satuan Karya Pramuka Pariwisata siap digunakan. Database bersih dan siap untuk pendataan.',
           type: 'INFO',
           createdAt: new Date().toISOString(),
           isRead: false,
-          actionUrl: '/members'
-        },
-        {
-          id: 'notif-2',
-          userId: 'user-admin-nasional',
-          title: 'Pengajuan Paket Wisata',
-          message: 'Paket "Walking Tour Heritage Bandung" diajukan untuk ditinjau.',
-          type: 'ALERT',
-          createdAt: new Date(Date.now() - 3600000).toISOString(),
-          isRead: false,
-          actionUrl: '/tours'
+          actionUrl: '/dashboard'
         }
       ];
       localStorage.setItem(STORAGE_KEYS.NOTIFICATIONS, JSON.stringify(initialNotifs));
@@ -196,6 +174,16 @@ class StorageService {
     } catch {
       return DEMO_USERS;
     }
+  }
+
+  public setUsers(users: CurrentUser[]) {
+    localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
+    this.notify();
+  }
+
+  public setMembers(members: Member[]) {
+    localStorage.setItem(STORAGE_KEYS.MEMBERS, JSON.stringify(members));
+    this.notify();
   }
 
   public assignMemberAsOperator(
@@ -429,7 +417,8 @@ class StorageService {
   public getMembers(): Member[] {
     try {
       const data = localStorage.getItem(STORAGE_KEYS.MEMBERS);
-      return data ? JSON.parse(data) : INITIAL_MEMBERS;
+      const parsed = data ? JSON.parse(data) : [];
+      return Array.isArray(parsed) && parsed.length > 0 ? parsed : INITIAL_MEMBERS;
     } catch {
       return INITIAL_MEMBERS;
     }
@@ -467,6 +456,56 @@ class StorageService {
 
     const nextSeq = (maxSeq + 1).toString().padStart(6, '0');
     return `${prefix}.${nextSeq}`;
+  }
+
+  public deleteMember(memberId: string, adminUser: CurrentUser, reason: string = 'Penghapusan data anggota oleh Super Admin'): boolean {
+    const members = this.getMembers();
+    const target = members.find(m => m.id === memberId);
+    if (!target) return false;
+
+    // Filter out the member
+    const updatedMembers = members.filter(m => m.id !== memberId);
+    localStorage.setItem(STORAGE_KEYS.MEMBERS, JSON.stringify(updatedMembers));
+
+    // Also remove from USERS list if tied to this member
+    const users = this.getUsers();
+    const updatedUsers = users.filter(u => u.memberId !== memberId && u.id !== target.userId && u.email !== target.email);
+    localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(updatedUsers));
+
+    // Add Audit Log
+    this.addAuditLog(
+      adminUser.id,
+      adminUser.name,
+      adminUser.role,
+      'DELETE_MEMBER',
+      'MEMBER',
+      memberId,
+      `Super Admin menghapus data keanggotaan ${target.fullName} (${target.nationalMemberNumber || 'Belum ada NTA'}). Alasan: ${reason}`
+    );
+
+    this.notify();
+    return true;
+  }
+
+  public deleteAllDummyMembers(adminUser: CurrentUser): number {
+    const members = this.getMembers();
+    const initialCount = members.length;
+    
+    // Clear all members or keep only user-created ones
+    localStorage.setItem(STORAGE_KEYS.MEMBERS, JSON.stringify([]));
+
+    this.addAuditLog(
+      adminUser.id,
+      adminUser.name,
+      adminUser.role,
+      'DELETE_ALL_MEMBERS',
+      'MEMBER',
+      'ALL',
+      `Super Admin membersihkan ${initialCount} data anggota dummy dari database.`
+    );
+
+    this.notify();
+    return initialCount;
   }
 
   public registerMember(payload: Omit<Member, 'id' | 'status' | 'registeredAt' | 'verificationToken' | 'locationHistory'>): Member {
@@ -760,10 +799,13 @@ class StorageService {
     );
 
     // Send in-app notification to the member
+    const isSelf = adminUser.id === member.userId || adminUser.memberId === memberId;
     this.addNotification(
       member.userId,
       'Pas Foto KTA Diperbarui',
-      `Pas foto resmi profil dan KTA Digital Anda telah diperbarui oleh Administrator (${adminUser.name}).`,
+      isSelf 
+        ? 'Pas foto resmi KTA dan profil Anda berhasil diperbarui.' 
+        : `Pas foto resmi profil dan KTA Digital Anda telah diperbarui oleh Administrator (${adminUser.name}).`,
       'INFO',
       '/my-card'
     );
@@ -798,7 +840,8 @@ class StorageService {
   public getTourPackages(): TourPackage[] {
     try {
       const data = localStorage.getItem(STORAGE_KEYS.TOURS);
-      return data ? JSON.parse(data) : INITIAL_TOUR_PACKAGES;
+      const parsed = data ? JSON.parse(data) : [];
+      return Array.isArray(parsed) && parsed.length > 0 ? parsed : INITIAL_TOUR_PACKAGES;
     } catch {
       return INITIAL_TOUR_PACKAGES;
     }
@@ -870,10 +913,130 @@ class StorageService {
   public getActivities(): Activity[] {
     try {
       const data = localStorage.getItem(STORAGE_KEYS.ACTIVITIES);
-      return data ? JSON.parse(data) : INITIAL_ACTIVITIES;
+      if (data) {
+        const parsed = JSON.parse(data);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
+        }
+      }
+      localStorage.setItem(STORAGE_KEYS.ACTIVITIES, JSON.stringify(INITIAL_ACTIVITIES));
+      return INITIAL_ACTIVITIES;
     } catch {
       return INITIAL_ACTIVITIES;
     }
+  }
+
+  public addActivity(activityData: Partial<Activity>): Activity {
+    const activities = this.getActivities();
+    const currentUser = this.getCurrentUser();
+    
+    const newActivity: Activity = {
+      id: `act-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      title: activityData.title || 'Agenda Saka Pariwisata',
+      slug: (activityData.title || 'agenda').toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+      description: activityData.description || '',
+      bannerUrl: activityData.bannerUrl || activityData.coverImage || 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=1200&auto=format&fit=crop&q=80',
+      coverImage: activityData.coverImage || activityData.bannerUrl || 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=1200&auto=format&fit=crop&q=80',
+      category: activityData.category || 'Perkemahan & Kemah Bakti',
+      organizerLevel: activityData.organizerLevel || (currentUser.role === 'SUPER_ADMIN' ? 'NASIONAL' : 'PROVINSI'),
+      organizerName: activityData.organizerName || (currentUser.role === 'SUPER_ADMIN' ? 'Kwartir Nasional Gerakan Pramuka' : `Pimpinan Saka Pariwisata ${currentUser.jurisdictionName || ''}`),
+      locationName: activityData.locationName || 'Lokasi Kegiatan',
+      locationAddress: activityData.locationAddress || '',
+      provinceId: activityData.provinceId || '32',
+      provinceName: activityData.provinceName || 'Jawa Barat',
+      regencyId: activityData.regencyId || '',
+      regencyName: activityData.regencyName || '',
+      scope: activityData.scope || 'Terbuka untuk Kader Saka Pariwisata',
+      startDate: activityData.startDate || new Date().toISOString().split('T')[0],
+      endDate: activityData.endDate || new Date(Date.now() + 86400000 * 2).toISOString().split('T')[0],
+      timeString: activityData.timeString || '08:00 WIB - Selesai',
+      capacity: activityData.capacity || 100,
+      maxParticipants: activityData.capacity || 100,
+      registeredCount: 0,
+      isPublic: activityData.isPublic ?? true,
+      status: activityData.status || 'OPEN_REGISTRATION',
+      requirements: activityData.requirements || [
+        'Anggota Aktif Saka Pariwisata atau Pramuka Penegak/Pandega',
+        'Memiliki KTA Digital Terverifikasi',
+        'Membawa perlengkapan kegiatan ramah lingkungan'
+      ],
+      contactPerson: activityData.contactPerson || currentUser.name,
+      contactPhone: activityData.contactPhone || '081299881122',
+      contactEmail: activityData.contactEmail || currentUser.email,
+      feeType: activityData.feeType || 'GRATIS',
+      feeAmount: activityData.feeAmount || 0,
+      uploadedByRole: currentUser.role as any,
+      uploadedByName: `${currentUser.name} (${currentUser.role === 'SUPER_ADMIN' ? 'Super Admin Kwarnas' : 'Operator ' + (currentUser.jurisdictionName || 'Kwartir')})`,
+      uploadedAt: new Date().toISOString(),
+      registrationLink: activityData.registrationLink || '',
+      featured: activityData.featured ?? false
+    };
+
+    activities.unshift(newActivity);
+    localStorage.setItem(STORAGE_KEYS.ACTIVITIES, JSON.stringify(activities));
+
+    this.addAuditLog(
+      currentUser.id,
+      currentUser.name,
+      currentUser.role,
+      'CREATE_ACTIVITY',
+      'ACTIVITY',
+      newActivity.id,
+      `Mengunggah agenda kegiatan baru: "${newActivity.title}" (${newActivity.organizerLevel})`
+    );
+
+    this.notify();
+    return newActivity;
+  }
+
+  public updateActivity(activityId: string, updates: Partial<Activity>): Activity | null {
+    const activities = this.getActivities();
+    const idx = activities.findIndex(a => a.id === activityId);
+    if (idx === -1) return null;
+
+    activities[idx] = {
+      ...activities[idx],
+      ...updates
+    };
+
+    localStorage.setItem(STORAGE_KEYS.ACTIVITIES, JSON.stringify(activities));
+
+    const currentUser = this.getCurrentUser();
+    this.addAuditLog(
+      currentUser.id,
+      currentUser.name,
+      currentUser.role,
+      'UPDATE_ACTIVITY',
+      'ACTIVITY',
+      activityId,
+      `Memperbarui agenda kegiatan: "${activities[idx].title}"`
+    );
+
+    this.notify();
+    return activities[idx];
+  }
+
+  public deleteActivity(activityId: string): boolean {
+    const activities = this.getActivities();
+    const act = activities.find(a => a.id === activityId);
+    if (!act) return false;
+
+    const filtered = activities.filter(a => a.id !== activityId);
+    localStorage.setItem(STORAGE_KEYS.ACTIVITIES, JSON.stringify(filtered));
+
+    const currentUser = this.getCurrentUser();
+    this.addAuditLog(
+      currentUser.id,
+      currentUser.name,
+      currentUser.role,
+      'DELETE_ACTIVITY',
+      'ACTIVITY',
+      activityId,
+      `Menghapus agenda kegiatan: "${act.title}"`
+    );
+
+    this.notify();
+    return true;
   }
 
   public registerForActivity(activityId: string, member: Member): boolean {
@@ -967,6 +1130,9 @@ class StorageService {
       const data = localStorage.getItem(STORAGE_KEYS.KTA_SETTINGS);
       if (!data) return DEFAULT_KTA_SETTINGS;
       const parsed = JSON.parse(data);
+      if (parsed.bgOpacity === 0.90 || parsed.bgOpacity === undefined) {
+        parsed.bgOpacity = 0.10;
+      }
       return { ...DEFAULT_KTA_SETTINGS, ...parsed };
     } catch {
       return DEFAULT_KTA_SETTINGS;
@@ -1001,7 +1167,8 @@ class StorageService {
   public getCulinarySouvenirs(): CulinarySouvenirItem[] {
     try {
       const data = localStorage.getItem(STORAGE_KEYS.CULINARY_SOUVENIRS);
-      return data ? JSON.parse(data) : INITIAL_CULINARY_SOUVENIRS;
+      const parsed = data ? JSON.parse(data) : [];
+      return Array.isArray(parsed) && parsed.length > 0 ? parsed : INITIAL_CULINARY_SOUVENIRS;
     } catch {
       return INITIAL_CULINARY_SOUVENIRS;
     }
@@ -1012,12 +1179,20 @@ class StorageService {
     currentUser: CurrentUser
   ): CulinarySouvenirItem {
     const items = this.getCulinarySouvenirs();
+    // Jika Super Admin atau Admin yang membuat, bisa langsung APPROVED, jika Member atau publik, PENDING_APPROVAL
+    const isAutoApprove = ['SUPER_ADMIN', 'ADMIN_PROVINCE', 'ADMIN_REGENCY', 'ADMIN_BRANCH'].includes(currentUser.role);
+    const status: ProductModerationStatus = item.status || (isAutoApprove ? 'APPROVED' : 'PENDING_APPROVAL');
+
     const newItem: CulinarySouvenirItem = {
       ...item,
       id: `cs-${Date.now()}`,
       createdAt: new Date().toISOString(),
       likesCount: 0,
-      status: item.status || 'PUBLISHED'
+      status,
+      submittedAt: new Date().toISOString(),
+      approvedAt: status === 'APPROVED' ? new Date().toISOString() : undefined,
+      approvedBy: status === 'APPROVED' ? currentUser.name : undefined,
+      approverRole: status === 'APPROVED' ? currentUser.role : undefined
     };
 
     items.unshift(newItem);
@@ -1031,20 +1206,94 @@ class StorageService {
       'CREATE_CULINARY_SOUVENIR',
       'CULINARY_SOUVENIR',
       newItem.id,
-      `Perekaman ${newItem.kind === 'KULINER' ? 'Kuliner Khas' : 'Cinderamata Khas'} "${newItem.name}" di ${newItem.districtName || 'Kwarran'}, ${newItem.regencyName || 'Kwarcab'}`
+      `Pengajuan produk/jasa 4 Krida "${newItem.name}" (${newItem.krida}) di ${newItem.districtName || 'Kwarran'}, ${newItem.regencyName || 'Kwarcab'} (Status: ${status})`
     );
 
-    // Add Notification
+    // Add Notification untuk Operator Wilayah / Super Admin
     this.addNotification(
-      'user-admin-nasional',
-      `Karya Baru Terdaftar: ${newItem.name}`,
-      `Anggota ${currentUser.name} menginput ${newItem.kind === 'KULINER' ? 'kuliner' : 'cinderamata'} khas ${newItem.districtName || 'Kwarran'}.`,
-      'SUCCESS',
+      'user-superadmin-rohadi',
+      `Pengajuan Produk Krida Baru: ${newItem.name}`,
+      `Anggota ${currentUser.name} mengajukan produk/karya (${newItem.krida}) dari ${newItem.districtName || 'Kwarran'}. Memerlukan peninjauan operator.`,
+      status === 'APPROVED' ? 'SUCCESS' : 'WARNING',
       '/dashboard'
     );
 
     this.notify();
     return newItem;
+  }
+
+  public approveCulinarySouvenir(id: string, approver: CurrentUser): CulinarySouvenirItem | null {
+    const items = this.getCulinarySouvenirs();
+    const idx = items.findIndex(i => i.id === id);
+    if (idx === -1) return null;
+
+    const item = items[idx];
+    item.status = 'APPROVED';
+    item.approvedAt = new Date().toISOString();
+    item.approvedBy = approver.name;
+    item.approverRole = approver.role;
+    item.rejectionReason = undefined;
+
+    items[idx] = item;
+    localStorage.setItem(STORAGE_KEYS.CULINARY_SOUVENIRS, JSON.stringify(items));
+
+    this.addAuditLog(
+      approver.id,
+      approver.name,
+      approver.role,
+      'APPROVE_CULINARY_SOUVENIR',
+      'CULINARY_SOUVENIR',
+      id,
+      `Operator ${approver.name} (${approver.jurisdictionName || approver.role}) menyetujui tayang produk "${item.name}" di galeri publik.`
+    );
+
+    this.addNotification(
+      item.authorMemberId,
+      `Produk Anda Disetujui: ${item.name}`,
+      `Karya/produk "${item.name}" Anda telah diverifikasi dan disetujui oleh Operator Wilayah (${approver.name}). Kini tampil di galeri publik.`,
+      'SUCCESS',
+      '/dashboard'
+    );
+
+    this.notify();
+    return item;
+  }
+
+  public rejectCulinarySouvenir(id: string, reason: string, approver: CurrentUser): CulinarySouvenirItem | null {
+    const items = this.getCulinarySouvenirs();
+    const idx = items.findIndex(i => i.id === id);
+    if (idx === -1) return null;
+
+    const item = items[idx];
+    item.status = 'REJECTED';
+    item.rejectionReason = reason;
+    item.approvedAt = undefined;
+    item.approvedBy = approver.name;
+    item.approverRole = approver.role;
+
+    items[idx] = item;
+    localStorage.setItem(STORAGE_KEYS.CULINARY_SOUVENIRS, JSON.stringify(items));
+
+    this.addAuditLog(
+      approver.id,
+      approver.name,
+      approver.role,
+      'REJECT_CULINARY_SOUVENIR',
+      'CULINARY_SOUVENIR',
+      id,
+      `Operator ${approver.name} menolak produk "${item.name}". Alasan: ${reason}`
+    );
+
+    this.addNotification(
+      item.authorMemberId,
+      `Pengajuan Produk Perlu Perbaikan: ${item.name}`,
+      `Pengajuan produk "${item.name}" ditolak dengan catatan: "${reason}". Silakan perbaiki dan ajukan kembali.`,
+      'ALERT',
+      '/dashboard'
+    );
+
+    this.notify();
+    return item;
   }
 
   public updateCulinarySouvenir(

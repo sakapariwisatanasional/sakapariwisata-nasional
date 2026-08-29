@@ -14,7 +14,10 @@ import {
   Sparkles,
   CreditCard,
   Utensils,
-  X
+  X,
+  Home,
+  FileSpreadsheet,
+  FolderOpen
 } from 'lucide-react';
 import { CurrentUser } from '../../types';
 import { SakaLogo } from '../common/SakaLogo';
@@ -27,6 +30,8 @@ interface SidebarProps {
   onOpenPublicPortal: () => void;
   isOpenMobile?: boolean;
   onCloseMobile?: () => void;
+  onOpenSpreadsheetModal?: () => void;
+  onOpenDriveModal?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -36,7 +41,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenRegisterModal,
   onOpenPublicPortal,
   isOpenMobile = false,
-  onCloseMobile
+  onCloseMobile,
+  onOpenSpreadsheetModal,
+  onOpenDriveModal
 }) => {
   const isSuperAdmin = currentUser.role === 'SUPER_ADMIN';
   const isAdmin = ['SUPER_ADMIN', 'ADMIN_PROVINCE', 'ADMIN_REGENCY', 'ADMIN_BRANCH'].includes(currentUser.role);
@@ -90,6 +97,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </span>
         </div>
 
+        {/* Landing Page */}
+        <button
+          onClick={() => handleItemClick('landing')}
+          className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl font-medium text-sm transition-all text-left cursor-pointer ${
+            currentTab === 'landing'
+              ? 'bg-purple-600/20 text-purple-300 font-semibold border border-purple-500/30 shadow-xs'
+              : 'text-slate-400 hover:bg-slate-900 hover:text-slate-200'
+          }`}
+        >
+          <Home className={`w-4 h-4 ${currentTab === 'landing' ? 'text-purple-400' : 'text-slate-400'}`} />
+          <span className="flex-1">Halaman Utama (Landing)</span>
+        </button>
+
         {/* Dashboard */}
         <button
           onClick={() => handleItemClick('dashboard')}
@@ -100,7 +120,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           }`}
         >
           <LayoutDashboard className={`w-4 h-4 ${currentTab === 'dashboard' ? 'text-purple-400' : 'text-slate-400'}`} />
-          <span className="flex-1">Dashboard</span>
+          <span className="flex-1">Dashboard Pengurus</span>
           {currentTab === 'dashboard' && <div className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse" />}
         </button>
 
@@ -229,6 +249,34 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <History className={`w-4 h-4 ${currentTab === 'audit-logs' ? 'text-emerald-400' : 'text-slate-400'}`} />
               <span className="flex-1">Audit Trail & Log</span>
             </button>
+
+            {onOpenSpreadsheetModal && (
+              <button
+                onClick={() => {
+                  onOpenSpreadsheetModal();
+                  if (onCloseMobile) onCloseMobile();
+                }}
+                className="w-full flex items-center gap-3 px-3.5 py-3 rounded-xl font-medium text-sm transition-all text-left cursor-pointer bg-emerald-950/40 text-emerald-300 hover:bg-emerald-950/70 border border-emerald-800/40 mt-1"
+              >
+                <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
+                <span className="flex-1">Database Spreadsheet</span>
+                <span className="text-[9px] px-1.5 py-0.5 bg-emerald-900 text-emerald-200 rounded font-mono">Live</span>
+              </button>
+            )}
+
+            {onOpenDriveModal && (
+              <button
+                onClick={() => {
+                  onOpenDriveModal();
+                  if (onCloseMobile) onCloseMobile();
+                }}
+                className="w-full flex items-center gap-3 px-3.5 py-3 rounded-xl font-medium text-sm transition-all text-left cursor-pointer bg-purple-950/40 text-purple-300 hover:bg-purple-950/70 border border-purple-800/40 mt-1"
+              >
+                <FolderOpen className="w-4 h-4 text-purple-400" />
+                <span className="flex-1">Media Google Drive</span>
+                <span className="text-[9px] px-1.5 py-0.5 bg-purple-900 text-purple-200 rounded font-mono">Cloud</span>
+              </button>
+            )}
           </div>
         )}
 

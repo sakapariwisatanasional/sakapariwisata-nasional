@@ -23,6 +23,8 @@ import { DigitalMemberCard } from '../components/member/DigitalMemberCard';
 import { NationalMapVisual } from '../components/dashboard/NationalMapVisual';
 import { CulinarySouvenirGallerySection } from '../components/dashboard/CulinarySouvenirGallerySection';
 import { TourPackageCarouselSection } from '../components/dashboard/TourPackageCarouselSection';
+import { IntegratedTourismShowcaseGallery } from '../components/dashboard/IntegratedTourismShowcaseGallery';
+import { DashboardWidget } from '../components/dashboard/DashboardWidget';
 import { SakaLogo } from '../components/common/SakaLogo';
 import { storage } from '../services/storage';
 
@@ -60,7 +62,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const isPublic = currentUser.role === 'PUBLIC';
   const isAdmin = currentUser.role !== 'MEMBER' && currentUser.role !== 'GUEST' && !isPublic;
   const ktaSettings = storage.getKtaSettings();
-  const currentOpacityPct = Math.round((ktaSettings.bgOpacity ?? 0.90) * 100);
+  const currentOpacityPct = Math.round((ktaSettings.bgOpacity ?? 0.10) * 100);
 
   // Live Culinary & Souvenir items
   const liveCulinaryItems = culinaryItems || storage.getCulinarySouvenirs();
@@ -137,7 +139,18 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
         </div>
 
-        {/* 1. Galeri Paket Wisata (Carousel Tepat di Bawah Header) */}
+        {/* 1. Galeri Terpadu Cerdas Saka Pariwisata (Destinasi Unggulan, Produk 4 Krida & Rekomendasi IP Location/Pilihan Wisata) */}
+        <IntegratedTourismShowcaseGallery
+          tours={tours}
+          products={liveCulinaryItems}
+          members={members}
+          currentUser={currentUser}
+          onViewTourDetail={onViewTourDetail}
+          onSelectMember={onVerifyMember}
+          onSelectTab={onSelectTab}
+        />
+
+        {/* 2. Galeri Paket Wisata (Carousel) */}
         <TourPackageCarouselSection
           tours={tours}
           currentUser={currentUser}
@@ -145,7 +158,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           onSelectTab={onSelectTab}
         />
 
-        {/* 2. Galeri Kuliner & Cinderamata Khas Daerah */}
+        {/* 3. Galeri Kuliner & Cinderamata Khas Daerah */}
         <CulinarySouvenirGallerySection
           items={liveCulinaryItems}
           currentUser={currentUser}
@@ -309,7 +322,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                         <div>
                           <p className="text-[10px] text-white/80 uppercase font-medium">Mulai dari</p>
                           <p className="text-sm sm:text-base font-extrabold font-heading text-emerald-300 leading-tight">
-                            Rp {tour.pricePerPerson.toLocaleString('id-ID')}
+                            Rp {(tour.pricePerPerson ?? 0).toLocaleString('id-ID')}
                             <span className="text-[10px] font-normal text-white/80"> / org</span>
                           </p>
                         </div>
@@ -436,7 +449,18 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
       </div>
 
-      {/* 1. Galeri Paket Wisata (Carousel Tepat di Bawah Header) */}
+      {/* 1. Galeri Terpadu Cerdas Saka Pariwisata (Destinasi Unggulan, Produk 4 Krida & Rekomendasi IP Location/Pilihan Wisata) */}
+      <IntegratedTourismShowcaseGallery
+        tours={tours}
+        products={liveCulinaryItems}
+        members={members}
+        currentUser={currentUser}
+        onViewTourDetail={onViewTourDetail}
+        onSelectMember={onVerifyMember}
+        onSelectTab={onSelectTab}
+      />
+
+      {/* 2. Galeri Paket Wisata (Carousel) */}
       <TourPackageCarouselSection
         tours={tours}
         currentUser={currentUser}
@@ -444,7 +468,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         onSelectTab={onSelectTab}
       />
 
-      {/* 2. Galeri Kuliner & Cinderamata Khas Daerah */}
+      {/* 3. Galeri Kuliner & Cinderamata Khas Daerah */}
       <CulinarySouvenirGallerySection
         items={liveCulinaryItems}
         currentUser={currentUser}
@@ -542,6 +566,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           <p className="text-[10px] sm:text-[11px] text-slate-500 mt-0.5 sm:mt-1">Cakupan Nasional RI</p>
         </div>
       </div>
+
+      {/* Visualisasi Pertumbuhan Anggota Menggunakan Recharts */}
+      <DashboardWidget 
+        members={members}
+        title="Visualisasi Pertumbuhan Anggota Saka Pariwisata"
+        subtitle="Analisis dinamika registrasi, kader aktif terverifikasi, dan tren penambahan berkala"
+      />
 
       {/* Main Grid: Left Table & Right Digital Card */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-6 items-start">
@@ -755,7 +786,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
                 <div className="pt-2 mt-2 border-t border-slate-200/60 flex items-center justify-between text-xs">
                   <span className="font-extrabold text-emerald-800 font-heading">
-                    Rp {tour.pricePerPerson.toLocaleString('id-ID')}
+                    Rp {(tour.pricePerPerson ?? 0).toLocaleString('id-ID')}
                   </span>
                   <span className="text-[10px] text-slate-400">{tour.durationDays} Hari</span>
                 </div>

@@ -48,8 +48,8 @@ export const CARD_BACKGROUND_PRESETS: {
     name: 'Latar Resmi Saka Pariwisata (Google Drive)',
     category: 'Resmi Nasional',
     url: SAKA_CARD_BG_DRIVE_DIRECT_URL,
-    description: 'Aset grafis resmi KTA Saka Pariwisata Kwartir Nasional',
-    recommendedOpacity: 0.90
+    description: 'Aset grafis resmi KTA Saka Pariwisata Kwartir Nasional (Standar Default Transparansi 10%)',
+    recommendedOpacity: 0.10
   },
   {
     id: 'nature_ecotourism',
@@ -57,7 +57,7 @@ export const CARD_BACKGROUND_PRESETS: {
     category: 'Wisata Alam',
     url: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=1200&auto=format&fit=crop&q=80',
     description: 'Nuansa hutan tropis zamrud & pegunungan nusantara',
-    recommendedOpacity: 0.90
+    recommendedOpacity: 0.10
   },
   {
     id: 'marine_archipelago',
@@ -65,7 +65,7 @@ export const CARD_BACKGROUND_PRESETS: {
     category: 'Wisata Bahari',
     url: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1200&auto=format&fit=crop&q=80',
     description: 'Gradasi perairan biru toska pesisir Indonesia',
-    recommendedOpacity: 0.90
+    recommendedOpacity: 0.10
   },
   {
     id: 'heritage_culture',
@@ -73,7 +73,7 @@ export const CARD_BACKGROUND_PRESETS: {
     category: 'Wisata Budaya',
     url: 'https://images.unsplash.com/photo-1596402184320-417e7178b2cd?w=1200&auto=format&fit=crop&q=80',
     description: 'Siluet kemegahan candi & arsitektur nusantara',
-    recommendedOpacity: 0.90
+    recommendedOpacity: 0.10
   },
   {
     id: 'security_mesh',
@@ -81,7 +81,7 @@ export const CARD_BACKGROUND_PRESETS: {
     category: 'Pola Sekuriti',
     url: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1200&auto=format&fit=crop&q=80',
     description: 'Pola sekuriti modern anti-pemalsuan bertekstur halus',
-    recommendedOpacity: 0.85
+    recommendedOpacity: 0.10
   },
   {
     id: 'clean_gradient',
@@ -160,7 +160,7 @@ export const KtaCardCustomizerModal: React.FC<KtaCardCustomizerModalProps> = ({
           setFormSettings(prev => ({
             ...prev,
             bgImageUrl: base64,
-            bgOpacity: prev.bgOpacity ?? 0.90
+            bgOpacity: prev.bgOpacity ?? 0.10
           }));
         }
       };
@@ -172,7 +172,7 @@ export const KtaCardCustomizerModal: React.FC<KtaCardCustomizerModalProps> = ({
     setFormSettings(prev => ({
       ...prev,
       bgImageUrl: preset.url,
-      bgOpacity: preset.recommendedOpacity > 0 ? preset.recommendedOpacity : 0.90
+      bgOpacity: preset.recommendedOpacity > 0 ? preset.recommendedOpacity : 0.10
     }));
   };
 
@@ -196,7 +196,7 @@ export const KtaCardCustomizerModal: React.FC<KtaCardCustomizerModalProps> = ({
   };
 
   const handleResetToDefault = () => {
-    if (window.confirm('Kembalikan seluruh format tampilan KTA ke Standar Nasional resmi (Transparansi Latar 90%)?')) {
+    if (window.confirm('Kembalikan seluruh format tampilan KTA ke Standar Nasional resmi (Transparansi Latar 10%)?')) {
       setFormSettings(DEFAULT_KTA_SETTINGS);
     }
   };
@@ -210,7 +210,7 @@ export const KtaCardCustomizerModal: React.FC<KtaCardCustomizerModalProps> = ({
       'UPDATE_KTA_TEMPLATE',
       'MEMBER',
       'KTA_TEMPLATE',
-      `Admin memperbarui desain latar belakang KTA (${formSettings.bgImageUrl ? 'Kustom' : 'Standar'}), transparansi (${Math.round((formSettings.bgOpacity ?? 0.90) * 100)}%), dan format otorisasi (${formSettings.signerName})`
+      `Admin memperbarui desain latar belakang KTA (${formSettings.bgImageUrl ? 'Kustom' : 'Standar'}), transparansi (${Math.round((formSettings.bgOpacity ?? 0.10) * 100)}%), dan format otorisasi (${formSettings.signerName})`
     );
 
     setShowSuccessToast(true);
@@ -354,7 +354,7 @@ export const KtaCardCustomizerModal: React.FC<KtaCardCustomizerModalProps> = ({
                       type="text"
                       value={formSettings.signerName}
                       onChange={(e) => setFormSettings({ ...formSettings, signerName: e.target.value })}
-                      placeholder="Contoh: Reza Pahlevi"
+                      placeholder="Contoh: Rohadi Wijaya"
                       className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none"
                     />
                   </div>
@@ -610,7 +610,7 @@ export const KtaCardCustomizerModal: React.FC<KtaCardCustomizerModalProps> = ({
                             Tingkat Transparansi / Opasitas Latar Belakang
                           </label>
                           <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 text-[9px] font-extrabold rounded-md">
-                            Default: 90%
+                            Default: 10%
                           </span>
                         </div>
                         <p className="text-[10px] text-slate-500">
@@ -620,14 +620,14 @@ export const KtaCardCustomizerModal: React.FC<KtaCardCustomizerModalProps> = ({
 
                       <div className="flex items-center gap-2">
                         <span className="font-mono font-extrabold text-sm text-purple-700">
-                          {Math.round((formSettings.bgOpacity ?? 0.90) * 100)}%
+                          {Math.round((formSettings.bgOpacity ?? 0.10) * 100)}%
                         </span>
                         <button
                           type="button"
-                          onClick={() => setFormSettings({ ...formSettings, bgOpacity: 0.90 })}
+                          onClick={() => setFormSettings({ ...formSettings, bgOpacity: 0.10 })}
                           className="text-[10px] font-bold text-purple-600 hover:text-purple-800 bg-purple-50 hover:bg-purple-100 px-2 py-1 rounded-lg border border-purple-200 transition-colors"
                         >
-                          Set ke 90% (Standar)
+                          Set ke 10% (Default Standar)
                         </button>
                       </div>
                     </div>
@@ -636,17 +636,18 @@ export const KtaCardCustomizerModal: React.FC<KtaCardCustomizerModalProps> = ({
                     <div className="space-y-1">
                       <input
                         type="range"
-                        min="0.10"
+                        min="0.05"
                         max="1.0"
                         step="0.05"
-                        value={formSettings.bgOpacity ?? 0.90}
+                        value={formSettings.bgOpacity ?? 0.10}
                         onChange={(e) => setFormSettings({ ...formSettings, bgOpacity: parseFloat(e.target.value) })}
                         className="w-full accent-purple-600 cursor-pointer h-2 bg-slate-200 rounded-lg"
                       />
                       <div className="flex justify-between text-[10px] text-slate-400 font-mono">
-                        <span>10% (Sangat Halus)</span>
+                        <span className="font-bold text-purple-700">10% (Standar Default)</span>
+                        <span>30% (Halus)</span>
                         <span>50% (Sedang)</span>
-                        <span className="font-bold text-purple-700">90% (Rekomendasi Resmi)</span>
+                        <span>75% (Tegas)</span>
                         <span>100% (Penuh)</span>
                       </div>
                     </div>
@@ -654,8 +655,8 @@ export const KtaCardCustomizerModal: React.FC<KtaCardCustomizerModalProps> = ({
                     {/* Quick Preset Opacity Chips */}
                     <div className="flex items-center gap-1.5 flex-wrap pt-1">
                       <span className="text-[10px] text-slate-500 font-semibold mr-1">Pilihan Cepat:</span>
-                      {[0.30, 0.50, 0.70, 0.85, 0.90, 1.0].map((val) => {
-                        const isCurrent = Math.abs((formSettings.bgOpacity ?? 0.90) - val) < 0.01;
+                      {[0.10, 0.20, 0.35, 0.50, 0.75, 0.90, 1.0].map((val) => {
+                        const isCurrent = Math.abs((formSettings.bgOpacity ?? 0.10) - val) < 0.01;
                         return (
                           <button
                             key={val}
@@ -667,7 +668,7 @@ export const KtaCardCustomizerModal: React.FC<KtaCardCustomizerModalProps> = ({
                                 : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
                             }`}
                           >
-                            {Math.round(val * 100)}%{val === 0.90 && ' ⭐ (Resmi)'}
+                            {Math.round(val * 100)}%{val === 0.10 && ' ⭐ (Default 10%)'}
                           </button>
                         );
                       })}

@@ -240,22 +240,39 @@ export interface Activity {
   slug: string;
   description: string;
   bannerUrl: string;
+  coverImage?: string;
   category: string;
   organizerLevel: 'NASIONAL' | 'PROVINSI' | 'KABUPATEN' | 'RANTING';
   organizerName: string;
   
   locationName: string;
+  locationAddress?: string;
+  provinceId?: string;
   provinceName: string;
+  regencyId?: string;
   regencyName: string;
+  scope?: string;
   
   startDate: string;
   endDate: string;
   timeString: string;
   capacity: number;
+  maxParticipants?: number;
   registeredCount: number;
   isPublic: boolean;
-  status: 'UPCOMING' | 'ONGOING' | 'COMPLETED' | 'CANCELLED';
+  status: 'UPCOMING' | 'ONGOING' | 'COMPLETED' | 'CANCELLED' | 'OPEN_REGISTRATION';
   requirements: string[];
+  
+  contactPerson?: string;
+  contactPhone?: string;
+  contactEmail?: string;
+  feeType?: 'GRATIS' | 'BERBAYAR' | 'SUBSIDI';
+  feeAmount?: number;
+  uploadedByRole?: 'SUPER_ADMIN' | 'ADMIN_PROVINCE' | 'ADMIN_REGENCY' | 'OPERATOR';
+  uploadedByName?: string;
+  uploadedAt?: string;
+  registrationLink?: string;
+  featured?: boolean;
 }
 
 export interface ActivityRegistration {
@@ -295,15 +312,27 @@ export interface AuditLog {
 
 export type ProductKind = 'KULINER' | 'CINDERAMATA';
 
+export type KridaProductCategory = 
+  | 'Pemanduan & Paket Wisata'    // Krida Pemandu (Walking Tour, Local Guide, Ekowisata)
+  | 'Fotografi & Media Wisata'     // Krida Penyuluh (Foto Wisata, Video Promosi, Cetak Karya)
+  | 'MICE, Kemah & Atraksi'       // Krida Atraksi & MICE (Scout Camp, Pertunjukan, Outbound)
+  | 'Kuliner & Minuman Daerah'    // Krida Kuliner & Cinderamata (Makanan Tradisional, Minuman Herbal)
+  | 'Kriya & Cinderamata Khas'    // Krida Kuliner & Cinderamata (Batik, Anyaman, Kerajinan, Suvenir)
+  | 'Jasa & Edukasi Wisata';      // Pelatihan, Storytelling, Workshop
+
+export type ProductModerationStatus = 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED';
+
 export interface CulinarySouvenirItem {
   id: string;
   name: string;
   kind: ProductKind; // 'KULINER' | 'CINDERAMATA'
-  categoryLabel: string; // e.g. "Makanan Khas", "Minuman Tradisional", "Kriya Anyaman", "Batik Daerah"
+  krida: KridaType;  // 'Krida Pemandu' | 'Krida Penyuluh' | 'Krida Mice & Event' | 'Krida Kuliner & Cinderamata'
+  kridaCategory: KridaProductCategory;
+  categoryLabel: string; // e.g. "Makanan Khas", "Minuman Tradisional", "Kriya Anyaman", "Batik Daerah", "Jasa Pemanduan", "Paket Kemah"
   description: string;
-  storyOrigin?: string; // Cerita/Filosofi/Sejarah Khas Daerah
+  storyOrigin?: string; // Cerita/Filosofi/Sejarah Khas Daerah atau Nilai Tambah
   priceEstimate: number;
-  priceUnit?: string; // e.g. "per porsi", "per buah", "per bungkus", "per lembar"
+  priceUnit?: string; // e.g. "per porsi", "per buah", "per pax", "per paket", "per hari", "per lembar"
   imageUrl: string;
   galleryImages?: string[];
   
@@ -323,14 +352,21 @@ export interface CulinarySouvenirItem {
   authorAvatarUrl?: string;
   authorRole?: string;
   
-  // Kontak & Sentra UMKM
+  // Kontak & Sentra UMKM / Pangkalan
   umkmName?: string;
   contactPhone: string; // WhatsApp untuk pemesanan / info
   contactEmail?: string;
   address?: string;
   tags: string[];
   
-  status: 'PUBLISHED' | 'PENDING';
+  // Alur Persetujuan Operator Wilayah
+  status: ProductModerationStatus; // 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED'
+  submittedAt?: string;
+  approvedAt?: string;
+  approvedBy?: string;
+  approverRole?: UserRole;
+  rejectionReason?: string;
+  
   createdAt: string;
   likesCount: number;
   featured?: boolean;
@@ -338,6 +374,8 @@ export interface CulinarySouvenirItem {
 
 export interface CurrentUser {
   id: string;
+  username?: string;
+  password?: string;
   email: string;
   name: string;
   role: UserRole;
@@ -354,7 +392,7 @@ export interface KtaCardSettings {
   // Background & Theme Customization
   cardTheme: KtaCardTheme;
   bgImageUrl?: string;
-  bgOpacity?: number; // 0.0 - 1.0 (default 0.9 / 90%)
+  bgOpacity?: number; // 0.0 - 1.0 (default 0.10 / 10%)
 
   // Front Side Customization
   frontOrganizationTitle: string;

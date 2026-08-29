@@ -13,7 +13,11 @@ import {
   MapPin,
   ExternalLink,
   Menu,
-  X
+  X,
+  FileSpreadsheet,
+  FolderOpen,
+  Home,
+  Lock
 } from 'lucide-react';
 import { CurrentUser, NotificationItem } from '../../types';
 import { DEMO_USERS } from '../../data/initialData';
@@ -28,6 +32,9 @@ interface HeaderProps {
   onOpenRegisterModal: () => void;
   onSelectTab: (tab: string) => void;
   onToggleMobileMenu?: () => void;
+  onOpenSpreadsheetModal?: () => void;
+  onOpenDriveModal?: () => void;
+  onOpenLoginModal?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -37,7 +44,10 @@ export const Header: React.FC<HeaderProps> = ({
   onSearchChange,
   onOpenRegisterModal,
   onSelectTab,
-  onToggleMobileMenu
+  onToggleMobileMenu,
+  onOpenSpreadsheetModal,
+  onOpenDriveModal,
+  onOpenLoginModal
 }) => {
   const [showRoleMenu, setShowRoleMenu] = useState(false);
   const [showNotifMenu, setShowNotifMenu] = useState(false);
@@ -136,6 +146,42 @@ export const Header: React.FC<HeaderProps> = ({
       {/* Right Controls */}
       <div className="flex items-center gap-1.5 sm:gap-3 flex-shrink-0">
         
+        {/* Tombol Landing Page */}
+        <button
+          onClick={() => onSelectTab('landing')}
+          className="hidden lg:flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all cursor-pointer border border-slate-200"
+          title="Buka Halaman Utama / Landing Page"
+        >
+          <Home className="w-3.5 h-3.5 text-slate-500" />
+          <span>Landing Page</span>
+        </button>
+
+        {/* Tombol Google Spreadsheet */}
+        {onOpenSpreadsheetModal && (
+          <button
+            onClick={onOpenSpreadsheetModal}
+            className="hidden sm:flex items-center gap-1.5 px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs"
+            title="Database Google Spreadsheet Terhubung"
+          >
+            <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+            <span className="hidden xl:inline">Google Spreadsheet</span>
+            <span className="xl:hidden">Database</span>
+          </button>
+        )}
+
+        {/* Tombol Google Drive Repository */}
+        {onOpenDriveModal && (
+          <button
+            onClick={onOpenDriveModal}
+            className="hidden md:flex items-center gap-1.5 px-3 py-2 bg-purple-50 hover:bg-purple-100 text-purple-900 border border-purple-300 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs"
+            title="Google Drive Repository Aset & Gambar"
+          >
+            <FolderOpen className="w-3.5 h-3.5 text-purple-600" />
+            <span className="hidden xl:inline">Google Drive</span>
+            <span className="xl:hidden">Drive</span>
+          </button>
+        )}
+
         {/* Mobile Search Toggle Button */}
         <button
           onClick={() => setShowMobileSearch(!showMobileSearch)}

@@ -11,12 +11,14 @@ import {
 } from './types';
 import { storage } from './services/storage';
 import { DEMO_USERS } from './data/initialData';
+import { spreadsheetService } from './services/spreadsheetService';
 
 // Layout Components
 import { Sidebar } from './components/layout/Sidebar';
 import { Header } from './components/layout/Header';
 
 // Page Views
+import { LandingPageView } from './pages/LandingPageView';
 import { DashboardView } from './pages/DashboardView';
 import { MemberManagementView } from './pages/MemberManagementView';
 import { TourismDirectoryView } from './pages/TourismDirectoryView';
@@ -28,6 +30,8 @@ import { PublicPortalView } from './pages/PublicPortalView';
 import { MyCardView } from './pages/MyCardView';
 
 // Modals
+import { AuthModal } from './components/auth/AuthModal';
+import { SpreadsheetSyncModal } from './components/database/SpreadsheetSyncModal';
 import { MemberFormModal } from './components/member/MemberFormModal';
 import { MemberVerificationModal } from './components/member/MemberVerificationModal';
 import { MemberTransferModal } from './components/member/MemberTransferModal';
@@ -41,11 +45,14 @@ import { OperatorRoleModal } from './components/member/OperatorRoleModal';
 import { CulinarySouvenirFormModal } from './components/culinary/CulinarySouvenirFormModal';
 import { CulinarySouvenirDetailModal } from './components/culinary/CulinarySouvenirDetailModal';
 import { CulinarySouvenirGallerySection } from './components/dashboard/CulinarySouvenirGallerySection';
+import { DriveMediaRepositoryModal } from './components/common/DriveMediaRepositoryModal';
 
 export default function App() {
-  // Current logged in user (Super Admin by default for full capability testing)
-  const [currentUser, setCurrentUser] = useState<CurrentUser>(DEMO_USERS[0]);
-  const [currentTab, setCurrentTab] = useState<string>('dashboard');
+  // Current logged in user
+  const [currentUser, setCurrentUser] = useState<CurrentUser>(storage.getCurrentUser() || DEMO_USERS[0]);
+  
+  // Default to Landing Page as requested
+  const [currentTab, setCurrentTab] = useState<string>('landing');
   const [searchQuery, setSearchQuery] = useState<string>('');
 
   // Reactive State from storage service
@@ -57,7 +64,13 @@ export default function App() {
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [culinaryItems, setCulinaryItems] = useState<CulinarySouvenirItem[]>([]);
 
-  // Modals State
+  // Auth & Spreadsheet Modals State
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [authModalTab, setAuthModalTab] = useState<'login' | 'register' | 'forgot'>('login');
+  const [isSpreadsheetModalOpen, setIsSpreadsheetModalOpen] = useState(false);
+  const [isDriveModalOpen, setIsDriveModalOpen] = useState(false);
+
+  // Other Modals State
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
   const [isTourFormModalOpen, setIsTourFormModalOpen] = useState(false);
   const [isEditKtaModalOpen, setIsEditKtaModalOpen] = useState(false);
@@ -71,6 +84,7 @@ export default function App() {
   const [verifyingMember, setVerifyingMember] = useState<Member | null>(null);
   const [transferringMember, setTransferringMember] = useState<Member | null>(null);
   const [selectedTourDetail, setSelectedTourDetail] = useState<TourPackage | null>(null);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   // Synchronize state with reactive storage
   useEffect(() => {
@@ -82,10 +96,45 @@ export default function App() {
       setSkills(storage.getSkills());
       setAuditLogs(storage.getAuditLogs());
       setCulinaryItems(storage.getCulinarySouvenirs());
+      setCurrentUser(storage.getCurrentUser());
     };
 
     syncState();
     return storage.subscribe(syncState);
+  }, []);
+
+  // Handle URL Query Params & Pathname for KTA Barcode/QR Code live lookup
+  useEffect(() => {
+    try {
+      const pathname = window.location.pathname;
+      let pathVerifyId = '';
+      if (pathname.includes('/verify/')) {
+        pathVerifyId = decodeURIComponent(pathname.split('/verify/')[1]?.split('?')[0] || '').trim();
+      }
+
+      const urlParams = new URLSearchParams(window.location.search);
+      const verifyId = urlParams.get('verifyId') || urlParams.get('nta') || urlParams.get('id') || urlParams.get('kta') || pathVerifyId;
+      const tabParam = urlParams.get('tab');
+
+      if (tabParam === 'verify-portal') {
+        setCurrentTab('verify-portal');
+      }
+
+      if (verifyId) {
+        const cleanId = verifyId.trim().toLowerCase();
+        const allMembers = storage.getMembers();
+        const found = allMembers.find(m => 
+          (m.nationalMemberNumber && m.nationalMemberNumber.toLowerCase() === cleanId) ||
+          (m.verificationToken && m.verificationToken.toLowerCase() === cleanId) ||
+          m.id.toLowerCase() === cleanId
+        );
+        if (found) {
+          setVerifyingMember(found);
+        }
+      }
+    } catch (e) {
+      console.warn('URL param parsing error', e);
+    }
   }, []);
 
   // Handlers for Member Management
@@ -99,6 +148,100 @@ export default function App() {
     alert('Status anggota diperbarui menjadi SUSPENDED.');
   };
 
+  // Super Admin Delete Member Handlers
+  const handleDeleteMember = (member: Member) => {
+    if (currentUser.role !== 'SUPER_ADMIN') {
+      alert('Hanya Super Admin Nasional yang memiliki wewenang menghapus data anggota.');
+      return;
+    }
+    const success = storage.deleteMember(member.id, currentUser);
+    if (success) {
+      alert(`Data keanggotaan ${member.fullName} telah berhasil dihapus dari database.`);
+    }
+  };
+
+  const handleDeleteAllDummyMembers = () => {
+    if (currentUser.role !== 'SUPER_ADMIN') {
+      alert('Hanya Super Admin Nasional yang memiliki wewenang membersihkan data dummy.');
+      return;
+    }
+    const count = storage.deleteAllDummyMembers(currentUser);
+    alert(`Berhasil menghapus ${count} data anggota dummy. Database anggota kini bersih.`);
+  };
+
+  // Open Auth Modal helper
+  const handleOpenAuth = (type: 'login' | 'register' | 'forgot') => {
+    setAuthModalTab(type);
+    setIsAuthModalOpen(true);
+  };
+
+  // IF CURRENT TAB IS LANDING PAGE
+  if (currentTab === 'landing') {
+    return (
+      <div className="min-h-screen bg-slate-900">
+        <LandingPageView
+          currentUser={currentUser}
+          members={members}
+          tours={tours}
+          culinaryItems={culinaryItems}
+          onOpenLoginModal={() => handleOpenAuth('login')}
+          onOpenRegisterModal={() => handleOpenAuth('register')}
+          onOpenVerifyModal={(m) => setVerifyingMember(m)}
+          onViewTourDetail={(t) => setSelectedTourDetail(t)}
+          onSelectCulinaryDetail={(item) => setSelectedCulinaryDetail(item)}
+          onOpenSpreadsheetModal={() => setIsSpreadsheetModalOpen(true)}
+          onOpenDriveModal={() => setIsDriveModalOpen(true)}
+          onEnterDashboard={(tab) => setCurrentTab(tab || 'dashboard')}
+        />
+
+        {/* Global Modals for Landing View */}
+        <AuthModal
+          isOpen={isAuthModalOpen}
+          initialTab={authModalTab}
+          onClose={() => setIsAuthModalOpen(false)}
+          onLoginSuccess={(user) => {
+            setCurrentUser(user);
+            setIsAuthModalOpen(false);
+            if (user.role === 'MEMBER') {
+              setCurrentTab('my-card');
+            } else {
+              setCurrentTab('dashboard');
+            }
+          }}
+        />
+
+        <SpreadsheetSyncModal
+          isOpen={isSpreadsheetModalOpen}
+          onClose={() => setIsSpreadsheetModalOpen(false)}
+        />
+
+        <MemberVerificationModal
+          member={verifyingMember}
+          onClose={() => setVerifyingMember(null)}
+        />
+
+        <TourPackageDetailModal
+          tour={selectedTourDetail}
+          onClose={() => setSelectedTourDetail(null)}
+        />
+
+        <CulinarySouvenirDetailModal
+          item={selectedCulinaryDetail}
+          currentUser={currentUser}
+          onClose={() => setSelectedCulinaryDetail(null)}
+          onEdit={(item) => {
+            setEditingCulinaryItem(item);
+            setIsCulinaryFormOpen(true);
+          }}
+          onDelete={(id) => {
+            storage.deleteCulinarySouvenir(id, currentUser);
+            setSelectedCulinaryDetail(null);
+          }}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="flex h-screen w-screen bg-slate-50 text-slate-900 overflow-hidden font-sans antialiased">
       {/* Fixed Sidebar */}
@@ -109,8 +252,12 @@ export default function App() {
           setSearchQuery('');
         }}
         currentUser={currentUser}
-        onOpenRegisterModal={() => setIsRegisterModalOpen(true)}
+        onOpenRegisterModal={() => handleOpenAuth('register')}
         onOpenPublicPortal={() => setCurrentTab('verify-portal')}
+        isOpenMobile={isMobileMenuOpen}
+        onCloseMobile={() => setIsMobileMenuOpen(false)}
+        onOpenSpreadsheetModal={() => setIsSpreadsheetModalOpen(true)}
+        onOpenDriveModal={() => setIsDriveModalOpen(true)}
       />
 
       {/* Main Content Area */}
@@ -120,14 +267,19 @@ export default function App() {
           currentUser={currentUser}
           onSwitchUser={(user) => {
             setCurrentUser(user);
+            storage.setCurrentUser(user);
             if (user.role === 'MEMBER') {
               setCurrentTab('my-card');
             }
           }}
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
-          onOpenRegisterModal={() => setIsRegisterModalOpen(true)}
+          onOpenRegisterModal={() => handleOpenAuth('register')}
           onSelectTab={setCurrentTab}
+          onToggleMobileMenu={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+          onOpenSpreadsheetModal={() => setIsSpreadsheetModalOpen(true)}
+          onOpenDriveModal={() => setIsDriveModalOpen(true)}
+          onOpenLoginModal={() => handleOpenAuth('login')}
         />
 
         {/* Scrollable Page Body */}
@@ -141,7 +293,7 @@ export default function App() {
                 provinces={provinces}
                 culinaryItems={culinaryItems}
                 onSelectTab={setCurrentTab}
-                onOpenRegisterModal={() => setIsRegisterModalOpen(true)}
+                onOpenRegisterModal={() => handleOpenAuth('register')}
                 onVerifyMember={(m) => setVerifyingMember(m)}
                 onApproveMemberQuick={handleApproveMember}
                 onViewTourDetail={(t) => setSelectedTourDetail(t)}
@@ -173,7 +325,7 @@ export default function App() {
                 currentUser={currentUser}
                 members={members}
                 provinces={provinces}
-                onOpenRegisterModal={() => setIsRegisterModalOpen(true)}
+                onOpenRegisterModal={() => handleOpenAuth('register')}
                 onOpenVerifyModal={(m) => setVerifyingMember(m)}
                 onOpenTransferModal={(m) => setTransferringMember(m)}
                 onApproveMember={handleApproveMember}
@@ -183,6 +335,8 @@ export default function App() {
                 onOpenEditMemberModal={(m) => setEditingMember(m)}
                 onOpenPrintPdfModal={(m) => setPrintingKtaMember(m)}
                 onOpenOperatorModal={(m) => setManagingOperatorMember(m)}
+                onDeleteMember={handleDeleteMember}
+                onDeleteAllDummyMembers={handleDeleteAllDummyMembers}
               />
             )}
 
@@ -229,7 +383,7 @@ export default function App() {
                 members={members}
                 tours={tours}
                 skills={skills}
-                onOpenRegisterModal={() => setIsRegisterModalOpen(true)}
+                onOpenRegisterModal={() => handleOpenAuth('register')}
                 onOpenVerifyModal={(m) => setVerifyingMember(m)}
                 onViewTourDetail={(t) => setSelectedTourDetail(t)}
                 onSelectTab={setCurrentTab}
@@ -252,7 +406,29 @@ export default function App() {
       </div>
 
       {/* Global Modals */}
-      {/* 1. Register Member Modal */}
+      {/* 1. Auth Modal (Login / Register / Forgot Password / View Password Toggle) */}
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        initialTab={authModalTab}
+        onClose={() => setIsAuthModalOpen(false)}
+        onLoginSuccess={(user) => {
+          setCurrentUser(user);
+          setIsAuthModalOpen(false);
+          if (user.role === 'MEMBER') {
+            setCurrentTab('my-card');
+          } else {
+            setCurrentTab('dashboard');
+          }
+        }}
+      />
+
+      {/* 2. Google Spreadsheet Sync & Database Manager */}
+      <SpreadsheetSyncModal
+        isOpen={isSpreadsheetModalOpen}
+        onClose={() => setIsSpreadsheetModalOpen(false)}
+      />
+
+      {/* 3. Register Member Modal */}
       <MemberFormModal
         isOpen={isRegisterModalOpen}
         onClose={() => setIsRegisterModalOpen(false)}
@@ -262,13 +438,13 @@ export default function App() {
         }}
       />
 
-      {/* 2. Public Safe Verification Modal */}
+      {/* 4. Public Safe Verification Modal */}
       <MemberVerificationModal
         member={verifyingMember}
         onClose={() => setVerifyingMember(null)}
       />
 
-      {/* 3. Member Transfer / Mutasi Modal */}
+      {/* 5. Member Transfer / Mutasi Modal */}
       <MemberTransferModal
         member={transferringMember}
         currentUser={currentUser}
@@ -276,7 +452,7 @@ export default function App() {
         onSuccess={() => setTransferringMember(null)}
       />
 
-      {/* 4. Tour Package Creation Modal */}
+      {/* 6. Tour Package Creation Modal */}
       <TourPackageFormModal
         isOpen={isTourFormModalOpen}
         currentUser={currentUser}
@@ -287,20 +463,20 @@ export default function App() {
         }}
       />
 
-      {/* 5. Tour Package Details & Itinerary Modal */}
+      {/* 7. Tour Package Details & Itinerary Modal */}
       <TourPackageDetailModal
         tour={selectedTourDetail}
         onClose={() => setSelectedTourDetail(null)}
       />
 
-      {/* 6. Admin KTA Card Customizer Modal */}
+      {/* 8. Admin KTA Card Customizer Modal */}
       <KtaCardCustomizerModal
         isOpen={isEditKtaModalOpen}
         currentUser={currentUser}
         onClose={() => setIsEditKtaModalOpen(false)}
       />
 
-      {/* 7. Member Photo Correction & Profile Sync Modal */}
+      {/* 9. Member Photo Correction & Profile Sync Modal */}
       <MemberPhotoEditModal
         isOpen={!!editingPhotoMember}
         member={editingPhotoMember}
@@ -309,7 +485,7 @@ export default function App() {
         onSuccess={() => setEditingPhotoMember(null)}
       />
 
-      {/* 8. Admin Manual Profile & Domicile Edit Modal */}
+      {/* 10. Admin Manual Profile & Domicile Edit Modal */}
       <AdminEditMemberModal
         isOpen={!!editingMember}
         member={editingMember}
@@ -318,7 +494,7 @@ export default function App() {
         onSuccess={() => setEditingMember(null)}
       />
 
-      {/* 9. KTA Print & PDF Export Modal (ISO/IEC 7810 ID-1 CR80 & A4 Sheet) */}
+      {/* 11. KTA Print & PDF Export Modal (ISO/IEC 7810 ID-1 CR80 & A4 Sheet) */}
       <KtaPrintPdfModal
         isOpen={!!printingKtaMember}
         member={printingKtaMember}
@@ -329,7 +505,7 @@ export default function App() {
         }}
       />
 
-      {/* 10. Operator Role Management Modal (Super Admin Only) */}
+      {/* 12. Operator Role Management Modal (Super Admin Only) */}
       <OperatorRoleModal
         isOpen={!!managingOperatorMember}
         member={managingOperatorMember}
@@ -338,7 +514,7 @@ export default function App() {
         onSuccess={() => setManagingOperatorMember(null)}
       />
 
-      {/* 11. Culinary & Souvenir Form Modal (Input Anggota Kwarran) */}
+      {/* 13. Culinary & Souvenir Form Modal */}
       <CulinarySouvenirFormModal
         isOpen={isCulinaryFormOpen}
         currentUser={currentUser}
@@ -354,7 +530,7 @@ export default function App() {
         }}
       />
 
-      {/* 12. Culinary & Souvenir Detail Modal */}
+      {/* 14. Culinary & Souvenir Detail Modal */}
       <CulinarySouvenirDetailModal
         item={selectedCulinaryDetail}
         currentUser={currentUser}
@@ -368,6 +544,13 @@ export default function App() {
           setSelectedCulinaryDetail(null);
         }}
       />
+
+      {/* 15. Google Drive Media Repository Modal */}
+      <DriveMediaRepositoryModal
+        isOpen={isDriveModalOpen}
+        onClose={() => setIsDriveModalOpen(false)}
+      />
     </div>
   );
 }
+

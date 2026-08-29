@@ -13,11 +13,14 @@ import {
   Info,
   Sliders,
   ZoomIn,
-  ZoomOut
+  ZoomOut,
+  FolderOpen,
+  ExternalLink
 } from 'lucide-react';
 import { Member, CurrentUser } from '../../types';
 import { storage } from '../../services/storage';
 import { SakaLogo } from '../common/SakaLogo';
+import { GOOGLE_DRIVE_MAIN_FOLDER, formatGoogleDriveUrl } from '../../services/driveRepository';
 
 interface MemberPhotoEditModalProps {
   isOpen: boolean;
@@ -339,35 +342,48 @@ export const MemberPhotoEditModal: React.FC<MemberPhotoEditModalProps> = ({
                 </div>
               )}
 
-              {/* Tab 3: Custom URL */}
+              {/* Tab 3: Custom URL & Google Drive */}
               {activeTab === 'url' && (
                 <div className="space-y-3">
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                      URL Tautan Gambar Pas Foto
-                    </label>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="block text-xs font-bold text-slate-700">
+                        URL Tautan Pas Foto / Google Drive
+                      </label>
+                      <a
+                        href={GOOGLE_DRIVE_MAIN_FOLDER.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[11px] text-purple-700 hover:text-purple-900 font-bold flex items-center gap-1"
+                      >
+                        <FolderOpen className="w-3 h-3 text-purple-600" />
+                        <span>Buka Folder Drive Anggota</span>
+                        <ExternalLink className="w-2.5 h-2.5" />
+                      </a>
+                    </div>
                     <div className="flex gap-2">
                       <input
                         type="url"
                         value={customUrl}
                         onChange={(e) => setCustomUrl(e.target.value)}
-                        placeholder="https://domain.com/path-to-photo.jpg"
+                        placeholder="https://drive.google.com/file/d/... atau https://domain.com/photo.jpg"
                         className="flex-1 px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-800 outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
                       />
                       <button
                         type="button"
                         onClick={() => {
                           if (customUrl.trim()) {
-                            setSelectedPhoto(customUrl.trim());
+                            const formatted = formatGoogleDriveUrl(customUrl.trim());
+                            setSelectedPhoto(formatted);
                           }
                         }}
-                        className="px-4 py-2 bg-purple-900 hover:bg-purple-950 text-white rounded-xl text-xs font-bold transition-colors"
+                        className="px-4 py-2 bg-purple-900 hover:bg-purple-950 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer"
                       >
                         Terapkan
                       </button>
                     </div>
-                    <p className="text-[11px] text-slate-400 mt-1">
-                      Pastikan URL dapat diakses secara publik dan menggunakan format gambar yang valid.
+                    <p className="text-[11px] text-slate-500 mt-1.5 leading-relaxed">
+                      💡 <strong>Dukungan Google Drive Otomatis:</strong> Anda dapat langsung menempelkan link share Google Drive. Pastikan opsi izin file di Drive disetel ke <em>"Anyone with the link"</em>.
                     </p>
                   </div>
                 </div>

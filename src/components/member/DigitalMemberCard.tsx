@@ -23,6 +23,7 @@ import { SakaLogo, SAKA_CARD_BG_DRIVE_DIRECT_URL, formatDriveImageUrl } from '..
 import { Barcode } from '../common/Barcode';
 import { storage, DEFAULT_KTA_SETTINGS } from '../../services/storage';
 import { KtaPrintPdfModal } from './KtaPrintPdfModal';
+import { KtaQrCode } from './KtaQrCode';
 import { downloadKtaPdfFile } from '../../services/ktaPdfGenerator';
 
 interface DigitalMemberCardProps {
@@ -49,7 +50,6 @@ export const DigitalMemberCard: React.FC<DigitalMemberCardProps> = ({
   previewSettings
 }) => {
   const [isFlipped, setIsFlipped] = useState(false);
-  const [qrDataUrl, setQrDataUrl] = useState<string>('');
   const [settings, setSettings] = useState<KtaCardSettings>(previewSettings || storage.getKtaSettings());
   const [isLocalPrintModalOpen, setIsLocalPrintModalOpen] = useState(false);
   const [isQuickExporting, setIsQuickExporting] = useState(false);
@@ -67,22 +67,6 @@ export const DigitalMemberCard: React.FC<DigitalMemberCardProps> = ({
     update();
     return storage.subscribe(update);
   }, [previewSettings]);
-
-  const verificationUrl = `${window.location.origin}/verify/${member.nationalMemberNumber || member.verificationToken}`;
-
-  useEffect(() => {
-    // Generate high-resolution QR code
-    QRCode.toDataURL(verificationUrl, {
-      width: 256,
-      margin: 1,
-      color: {
-        dark: '#1e0842',
-        light: '#ffffff'
-      }
-    })
-      .then(url => setQrDataUrl(url))
-      .catch(err => console.error('Error generating QR', err));
-  }, [verificationUrl, member.nationalMemberNumber, member.verificationToken]);
 
   const handlePrint = () => {
     window.print();
@@ -177,11 +161,11 @@ export const DigitalMemberCard: React.FC<DigitalMemberCardProps> = ({
         >
           {/* ================= FRONT SIDE ================= */}
           <div className={`absolute inset-0 w-full h-full ${theme.frontBg} rounded-2xl p-5 text-white shadow-2xl border backface-hidden flex flex-col justify-between overflow-hidden`}>
-            {/* Custom Google Drive Background Artwork (90% Opacity) */}
+            {/* Custom Google Drive Background Artwork (10% Default Opacity) */}
             {(settings.bgImageUrl || SAKA_CARD_BG_DRIVE_DIRECT_URL) && (
               <div 
                 className="absolute inset-0 w-full h-full pointer-events-none z-0 overflow-hidden rounded-2xl"
-                style={{ opacity: settings.bgOpacity ?? 0.90 }}
+                style={{ opacity: settings.bgOpacity ?? 0.10 }}
               >
                 <img
                   src={formatDriveImageUrl(settings.bgImageUrl || SAKA_CARD_BG_DRIVE_DIRECT_URL)}
@@ -299,19 +283,14 @@ export const DigitalMemberCard: React.FC<DigitalMemberCardProps> = ({
                 </div>
               </div>
 
-              {/* QR Code for Verification */}
-              <div className="flex flex-col items-center flex-shrink-0 bg-white p-1 rounded-xl shadow-lg border border-purple-200/50">
-                {qrDataUrl ? (
-                  <img src={qrDataUrl} alt="QR Verifikasi" className="w-16 h-16 rounded-sm" />
-                ) : (
-                  <div className="w-16 h-16 bg-slate-100 animate-pulse rounded flex items-center justify-center text-[9px] text-slate-400">
-                    QR
-                  </div>
-                )}
-                <span className="text-[7px] text-purple-950 font-bold uppercase mt-0.5 tracking-tighter">
-                  Scan Verifikasi
-                </span>
-              </div>
+              {/* QR Code for Verification with Encoded NTA */}
+              <KtaQrCode 
+                member={member} 
+                size={58} 
+                showLabel={true}
+                interactive={true}
+                onVerifyClick={onVerifyClick}
+              />
             </div>
 
             {/* Card Footer */}
@@ -323,11 +302,11 @@ export const DigitalMemberCard: React.FC<DigitalMemberCardProps> = ({
 
           {/* ================= BACK SIDE ================= */}
           <div className={`absolute inset-0 w-full h-full ${theme.backBg} rounded-2xl p-5 text-white shadow-2xl border backface-hidden rotate-y-180 flex flex-col justify-between overflow-hidden`}>
-            {/* Custom Google Drive Background Artwork (90% Opacity) */}
+            {/* Custom Google Drive Background Artwork (10% Default Opacity) */}
             {(settings.bgImageUrl || SAKA_CARD_BG_DRIVE_DIRECT_URL) && (
               <div 
                 className="absolute inset-0 w-full h-full pointer-events-none z-0 overflow-hidden rounded-2xl"
-                style={{ opacity: (settings.bgOpacity ?? 0.90) * 0.85 }}
+                style={{ opacity: (settings.bgOpacity ?? 0.10) * 0.85 }}
               >
                 <img
                   src={formatDriveImageUrl(settings.bgImageUrl || SAKA_CARD_BG_DRIVE_DIRECT_URL)}
@@ -400,7 +379,7 @@ export const DigitalMemberCard: React.FC<DigitalMemberCardProps> = ({
 
                 {/* Signer Name (Under Barcode) */}
                 <p className="font-bold text-[8.5px] text-white mt-1 leading-tight tracking-wide">
-                  {settings.signerName || 'Reza Pahlevi'}
+                  {settings.signerName || 'Rohadi Wijaya'}
                 </p>
 
                 {/* Signer Title (Under Name) */}
@@ -454,9 +433,10 @@ export const DigitalMemberCard: React.FC<DigitalMemberCardProps> = ({
             <button
               onClick={() => onEditPhoto && onEditPhoto(member)}
               className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-900/90 hover:bg-purple-950 text-white rounded-xl text-xs font-semibold transition-colors shadow-xs cursor-pointer"
+              title="Unggah berkas atau ganti link pas foto KTA"
             >
               <Camera className="w-3.5 h-3.5 text-purple-300" />
-              <span>Perbaiki Foto KTA</span>
+              <span>Ubah / Upload Foto KTA</span>
             </button>
           )}
 

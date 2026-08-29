@@ -233,7 +233,7 @@ export const TourPackageCarouselSection: React.FC<TourPackageCarouselSectionProp
                     <div>
                       <p className="text-[9px] sm:text-[10px] text-teal-200 uppercase font-semibold">Mulai dari</p>
                       <p className="text-sm sm:text-lg font-extrabold font-heading text-white leading-tight">
-                        Rp {tour.pricePerPerson.toLocaleString('id-ID')}
+                        Rp {(tour.pricePerPerson ?? 0).toLocaleString('id-ID')}
                         <span className="text-[10px] font-normal text-slate-300"> / org</span>
                       </p>
                     </div>

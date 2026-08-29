@@ -35,43 +35,42 @@ export const OperatorRoleModal: React.FC<OperatorRoleModalProps> = ({
   onClose,
   onSuccess
 }) => {
-  if (!isOpen || !member) return null;
-
   const isSuperAdmin = currentUser.role === 'SUPER_ADMIN';
   const provinces = storage.getProvinces();
   const allRegencies = storage.getRegencies();
 
   // Form State
   const [selectedRole, setSelectedRole] = useState<UserRole>(
-    member.operatorRole || 'ADMIN_REGENCY'
+    member?.operatorRole || 'ADMIN_REGENCY'
   );
   const [selectedProvinceId, setSelectedProvinceId] = useState<string>(
-    member.provinceId || '32'
+    member?.provinceId || '32'
   );
   const [selectedRegencyId, setSelectedRegencyId] = useState<string>(
-    member.operatorJurisdictionId || member.regencyId || '32.06'
+    member?.operatorJurisdictionId || member?.regencyId || '32.06'
   );
   const [assignmentNotes, setAssignmentNotes] = useState<string>(
-    member.operatorNotes || `Surat Keputusan Penugasan Operator Kwartir No. SK-${member.regencyId.replace('.', '')}-${new Date().getFullYear()}/01`
+    member?.operatorNotes || `Surat Keputusan Penugasan Operator Kwartir No. SK-${member?.regencyId ? member.regencyId.replace('.', '') : '3206'}-${new Date().getFullYear()}/01`
   );
   const [revokeReason, setRevokeReason] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [activeTab, setActiveTab] = useState<'assign' | 'revoke'>(
-    member.isOperator ? 'assign' : 'assign'
-  );
+  const [activeTab, setActiveTab] = useState<'assign' | 'revoke'>('assign');
 
-  // Synchronize when member changes
+  // Synchronize when member or isOpen changes
   useEffect(() => {
-    if (member) {
+    if (member && isOpen) {
       setSelectedRole(member.operatorRole || 'ADMIN_REGENCY');
       setSelectedProvinceId(member.provinceId || '32');
       setSelectedRegencyId(member.operatorJurisdictionId || member.regencyId || '32.06');
       setAssignmentNotes(
-        member.operatorNotes || `Surat Tugas Operator Kwarcab No. ST-${member.regencyId.replace('.', '')}/${new Date().getFullYear()}/042`
+        member.operatorNotes || `Surat Tugas Operator Kwarcab No. ST-${member.regencyId ? member.regencyId.replace('.', '') : '3206'}/${new Date().getFullYear()}/042`
       );
       setRevokeReason('');
+      setActiveTab('assign');
     }
-  }, [member]);
+  }, [member, isOpen]);
+
+  if (!isOpen || !member) return null;
 
   const regenciesForProvince = storage.getRegencies(selectedProvinceId);
 
