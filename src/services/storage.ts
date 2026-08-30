@@ -55,6 +55,7 @@ export const DEFAULT_KTA_SETTINGS: KtaCardSettings = {
 };
 
 const STORAGE_KEYS = {
+  IS_INITIALIZED: 'saka_initialized_v2',
   MEMBERS: 'saka_members_v2',
   TOURS: 'saka_tours_v2',
   ACTIVITIES: 'saka_activities_v2',
@@ -90,18 +91,28 @@ class StorageService {
     ];
     legacyKeys.forEach(k => localStorage.removeItem(k));
 
-    if (!localStorage.getItem(STORAGE_KEYS.MEMBERS)) {
-      localStorage.setItem(STORAGE_KEYS.MEMBERS, JSON.stringify(INITIAL_MEMBERS));
+    const isInitialized = localStorage.getItem(STORAGE_KEYS.IS_INITIALIZED);
+
+    // Hanya isi data bawaan saat pertama kali aplikasi diinisialisasi
+    if (!isInitialized) {
+      if (localStorage.getItem(STORAGE_KEYS.MEMBERS) === null) {
+        localStorage.setItem(STORAGE_KEYS.MEMBERS, JSON.stringify(INITIAL_MEMBERS));
+      }
+      if (localStorage.getItem(STORAGE_KEYS.TOURS) === null) {
+        localStorage.setItem(STORAGE_KEYS.TOURS, JSON.stringify(INITIAL_TOUR_PACKAGES));
+      }
+      if (localStorage.getItem(STORAGE_KEYS.ACTIVITIES) === null) {
+        localStorage.setItem(STORAGE_KEYS.ACTIVITIES, JSON.stringify(INITIAL_ACTIVITIES));
+      }
+      if (localStorage.getItem(STORAGE_KEYS.AUDIT_LOGS) === null) {
+        localStorage.setItem(STORAGE_KEYS.AUDIT_LOGS, JSON.stringify(INITIAL_AUDIT_LOGS));
+      }
+      if (localStorage.getItem(STORAGE_KEYS.CULINARY_SOUVENIRS) === null) {
+        localStorage.setItem(STORAGE_KEYS.CULINARY_SOUVENIRS, JSON.stringify(INITIAL_CULINARY_SOUVENIRS));
+      }
+      localStorage.setItem(STORAGE_KEYS.IS_INITIALIZED, 'true');
     }
-    if (!localStorage.getItem(STORAGE_KEYS.TOURS)) {
-      localStorage.setItem(STORAGE_KEYS.TOURS, JSON.stringify(INITIAL_TOUR_PACKAGES));
-    }
-    if (!localStorage.getItem(STORAGE_KEYS.ACTIVITIES)) {
-      localStorage.setItem(STORAGE_KEYS.ACTIVITIES, JSON.stringify(INITIAL_ACTIVITIES));
-    }
-    if (!localStorage.getItem(STORAGE_KEYS.AUDIT_LOGS)) {
-      localStorage.setItem(STORAGE_KEYS.AUDIT_LOGS, JSON.stringify(INITIAL_AUDIT_LOGS));
-    }
+
     if (!localStorage.getItem(STORAGE_KEYS.CURRENT_USER)) {
       localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(DEMO_USERS[0]));
     } else {
@@ -134,9 +145,6 @@ class StorageService {
         }
       ];
       localStorage.setItem(STORAGE_KEYS.NOTIFICATIONS, JSON.stringify(initialNotifs));
-    }
-    if (!localStorage.getItem(STORAGE_KEYS.CULINARY_SOUVENIRS)) {
-      localStorage.setItem(STORAGE_KEYS.CULINARY_SOUVENIRS, JSON.stringify(INITIAL_CULINARY_SOUVENIRS));
     }
   }
 
@@ -422,21 +430,14 @@ class StorageService {
   public getMembers(): Member[] {
     try {
       const data = localStorage.getItem(STORAGE_KEYS.MEMBERS);
-      const parsed: Member[] = data ? JSON.parse(data) : [];
-      
-      // Combine stored members with INITIAL_MEMBERS to guarantee all showcase & national executive records exist
-      const memberMap = new Map<string, Member>();
-      INITIAL_MEMBERS.forEach(m => memberMap.set(m.id, m));
-      if (Array.isArray(parsed)) {
-        parsed.forEach(m => {
-          if (m && m.id) {
-            memberMap.set(m.id, m);
-          }
-        });
+      if (data !== null) {
+        const parsed = JSON.parse(data);
+        return Array.isArray(parsed) ? parsed : [];
       }
-      return Array.from(memberMap.values());
-    } catch {
+      localStorage.setItem(STORAGE_KEYS.MEMBERS, JSON.stringify(INITIAL_MEMBERS));
       return INITIAL_MEMBERS;
+    } catch {
+      return [];
     }
   }
 
@@ -632,10 +633,6 @@ class StorageService {
 
   public approveMember(memberId: string, verifierName?: string): Member | null {
     return this.updateMemberStatus(memberId, 'ACTIVE', verifierName || 'Admin Saka Pariwisata');
-  }
-
-  public updateTourStatus(tourId: string, status: TourStatus, reviewerName?: string, rejectionReason?: string) {
-    this.moderateTourPackage(tourId, status, reviewerName || 'Admin Saka Pariwisata', rejectionReason);
   }
 
   public transferMemberLocation(
@@ -874,10 +871,14 @@ class StorageService {
   public getTourPackages(): TourPackage[] {
     try {
       const data = localStorage.getItem(STORAGE_KEYS.TOURS);
-      const parsed = data ? JSON.parse(data) : [];
-      return Array.isArray(parsed) && parsed.length > 0 ? parsed : INITIAL_TOUR_PACKAGES;
-    } catch {
+      if (data !== null) {
+        const parsed = JSON.parse(data);
+        return Array.isArray(parsed) ? parsed : [];
+      }
+      localStorage.setItem(STORAGE_KEYS.TOURS, JSON.stringify(INITIAL_TOUR_PACKAGES));
       return INITIAL_TOUR_PACKAGES;
+    } catch {
+      return [];
     }
   }
 
@@ -943,20 +944,66 @@ class StorageService {
     this.notify();
   }
 
+  public updateTourStatus(tourId: string, status: TourStatus, reviewerName?: string, rejectionReason?: string) {
+    const reviewer = reviewerName || this.getCurrentUser().name;
+    this.moderateTourPackage(tourId, status, reviewer, rejectionReason);
+  }
+
+  public deleteTourPackage(tourId: string, user?: CurrentUser): boolean {
+    const tours = this.getTourPackages();
+    const target = tours.find(t => t.id === tourId);
+    if (!target) return false;
+
+    const filtered = tours.filter(t => t.id !== tourId);
+    localStorage.setItem(STORAGE_KEYS.TOURS, JSON.stringify(filtered));
+
+    const currentUser = user || this.getCurrentUser();
+    this.addAuditLog(
+      currentUser.id,
+      currentUser.name,
+      currentUser.role,
+      'DELETE_TOUR_PACKAGE',
+      'TOUR_PACKAGE',
+      tourId,
+      `Menghapus paket wisata: "${target.title}"`
+    );
+
+    this.notify();
+    return true;
+  }
+
+  public deleteAllDummyTours(user?: CurrentUser): number {
+    const tours = this.getTourPackages();
+    const count = tours.length;
+    localStorage.setItem(STORAGE_KEYS.TOURS, JSON.stringify([]));
+
+    const currentUser = user || this.getCurrentUser();
+    this.addAuditLog(
+      currentUser.id,
+      currentUser.name,
+      currentUser.role,
+      'DELETE_ALL_TOURS',
+      'TOUR_PACKAGE',
+      'ALL',
+      `Super Admin membersihkan ${count} paket wisata dummy dari database.`
+    );
+
+    this.notify();
+    return count;
+  }
+
   // --- Activities ---
   public getActivities(): Activity[] {
     try {
       const data = localStorage.getItem(STORAGE_KEYS.ACTIVITIES);
-      if (data) {
+      if (data !== null) {
         const parsed = JSON.parse(data);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed;
-        }
+        return Array.isArray(parsed) ? parsed : [];
       }
       localStorage.setItem(STORAGE_KEYS.ACTIVITIES, JSON.stringify(INITIAL_ACTIVITIES));
       return INITIAL_ACTIVITIES;
     } catch {
-      return INITIAL_ACTIVITIES;
+      return [];
     }
   }
 
@@ -1264,10 +1311,14 @@ class StorageService {
   public getCulinarySouvenirs(): CulinarySouvenirItem[] {
     try {
       const data = localStorage.getItem(STORAGE_KEYS.CULINARY_SOUVENIRS);
-      const parsed = data ? JSON.parse(data) : [];
-      return Array.isArray(parsed) && parsed.length > 0 ? parsed : INITIAL_CULINARY_SOUVENIRS;
-    } catch {
+      if (data !== null) {
+        const parsed = JSON.parse(data);
+        return Array.isArray(parsed) ? parsed : [];
+      }
+      localStorage.setItem(STORAGE_KEYS.CULINARY_SOUVENIRS, JSON.stringify(INITIAL_CULINARY_SOUVENIRS));
       return INITIAL_CULINARY_SOUVENIRS;
+    } catch {
+      return [];
     }
   }
 
@@ -1456,6 +1507,78 @@ class StorageService {
     localStorage.setItem(STORAGE_KEYS.CULINARY_SOUVENIRS, JSON.stringify(items));
     this.notify();
     return target.likesCount;
+  }
+
+  public deleteAllDummyCulinary(user?: CurrentUser): number {
+    const items = this.getCulinarySouvenirs();
+    const count = items.length;
+    localStorage.setItem(STORAGE_KEYS.CULINARY_SOUVENIRS, JSON.stringify([]));
+
+    const currentUser = user || this.getCurrentUser();
+    this.addAuditLog(
+      currentUser.id,
+      currentUser.name,
+      currentUser.role,
+      'DELETE_ALL_CULINARY',
+      'CULINARY_SOUVENIR',
+      'ALL',
+      `Super Admin membersihkan ${count} produk kuliner/cinderamata dummy dari database.`
+    );
+
+    this.notify();
+    return count;
+  }
+
+  public deleteAllDummyActivities(user?: CurrentUser): number {
+    const acts = this.getActivities();
+    const count = acts.length;
+    localStorage.setItem(STORAGE_KEYS.ACTIVITIES, JSON.stringify([]));
+
+    const currentUser = user || this.getCurrentUser();
+    this.addAuditLog(
+      currentUser.id,
+      currentUser.name,
+      currentUser.role,
+      'DELETE_ALL_ACTIVITIES',
+      'ACTIVITY',
+      'ALL',
+      `Super Admin membersihkan ${count} agenda kegiatan dummy dari database.`
+    );
+
+    this.notify();
+    return count;
+  }
+
+  public clearAllDummyData(user?: CurrentUser) {
+    const currentUser = user || this.getCurrentUser();
+    const memCount = this.getMembers().length;
+    const tourCount = this.getTourPackages().length;
+    const actCount = this.getActivities().length;
+    const culCount = this.getCulinarySouvenirs().length;
+
+    localStorage.setItem(STORAGE_KEYS.MEMBERS, JSON.stringify([]));
+    localStorage.setItem(STORAGE_KEYS.TOURS, JSON.stringify([]));
+    localStorage.setItem(STORAGE_KEYS.ACTIVITIES, JSON.stringify([]));
+    localStorage.setItem(STORAGE_KEYS.CULINARY_SOUVENIRS, JSON.stringify([]));
+    localStorage.setItem(STORAGE_KEYS.IS_INITIALIZED, 'true');
+
+    this.addAuditLog(
+      currentUser.id,
+      currentUser.name,
+      currentUser.role,
+      'CLEAR_ALL_DUMMY_DATA',
+      'SYSTEM',
+      'ALL',
+      `Super Admin membersihkan seluruh data peraga/dummy sistem (${memCount} Anggota, ${tourCount} Paket Wisata, ${actCount} Agenda, ${culCount} Produk Krida).`
+    );
+
+    this.notify();
+    return {
+      members: memCount,
+      tours: tourCount,
+      activities: actCount,
+      culinary: culCount
+    };
   }
 
   public resetToDefault() {
