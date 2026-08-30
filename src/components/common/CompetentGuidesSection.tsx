@@ -23,7 +23,7 @@ import {
   UserCheck
 } from 'lucide-react';
 import { Member, Province, KridaType } from '../../types';
-import { formatDriveImageUrl } from './SakaLogo';
+import { formatDriveImageUrl, getDriveDirectFallbackUrl, getValidAvatarUrl } from './SakaLogo';
 
 interface CompetentGuidesSectionProps {
   members: Member[];
@@ -460,9 +460,15 @@ export const CompetentGuidesSection: React.FC<CompetentGuidesSectionProps> = ({
                           alt={member.fullName}
                           loading="lazy"
                           referrerPolicy="no-referrer"
-                          className="w-16 h-16 rounded-2xl object-cover border-2 border-purple-500/40 group-hover:scale-105 transition-transform duration-300 shadow-md"
+                          className="w-16 h-16 rounded-2xl object-cover border-2 border-purple-500/40 group-hover:scale-105 transition-transform duration-300 shadow-md bg-slate-900"
                           onError={(e) => {
-                            (e.target as HTMLImageElement).src = defaultAvatar;
+                            const img = e.target as HTMLImageElement;
+                            const directFallback = getDriveDirectFallbackUrl(member.avatarUrl);
+                            if (directFallback && img.src !== directFallback) {
+                              img.src = directFallback;
+                            } else if (img.src !== defaultAvatar) {
+                              img.src = defaultAvatar;
+                            }
                           }}
                         />
                         <div className="absolute -bottom-1.5 -right-1.5 w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-md border-2 border-slate-950" title="KTA Terverifikasi">

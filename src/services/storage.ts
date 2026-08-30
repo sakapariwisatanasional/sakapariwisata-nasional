@@ -91,6 +91,32 @@ class StorageService {
     ];
     legacyKeys.forEach(k => localStorage.removeItem(k));
 
+    // Bersihkan data dummy anggota dan operator bawaan sistem dari storage
+    try {
+      const dummyMemberIds = ['mem-nasional-01', 'mem-nasional-02'];
+      const dummyUserIds = ['user-kwarda-jabar', 'user-kwarcab-bandung', 'user-kwarran-ciwidey', 'user-nasional-rahmat'];
+      
+      const rawMembers = localStorage.getItem(STORAGE_KEYS.MEMBERS);
+      if (rawMembers) {
+        const mems: Member[] = JSON.parse(rawMembers);
+        const filteredMems = mems.filter(m => !dummyMemberIds.includes(m.id));
+        if (filteredMems.length !== mems.length) {
+          localStorage.setItem(STORAGE_KEYS.MEMBERS, JSON.stringify(filteredMems));
+        }
+      }
+
+      const rawUsers = localStorage.getItem(STORAGE_KEYS.USERS);
+      if (rawUsers) {
+        const usrs: CurrentUser[] = JSON.parse(rawUsers);
+        const filteredUsrs = usrs.filter(u => !dummyUserIds.includes(u.id));
+        if (filteredUsrs.length !== usrs.length) {
+          localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(filteredUsrs));
+        }
+      }
+    } catch (e) {
+      console.warn('Dummy cleanup error:', e);
+    }
+
     const isInitialized = localStorage.getItem(STORAGE_KEYS.IS_INITIALIZED);
 
     // Hanya isi data bawaan saat pertama kali aplikasi diinisialisasi
@@ -120,7 +146,7 @@ class StorageService {
         const rawUser = localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
         if (rawUser) {
           const u: CurrentUser = JSON.parse(rawUser);
-          if (u.role === 'SUPER_ADMIN' || u.name.includes('Reza') || u.name.includes('Suryadi')) {
+          if (u.role === 'SUPER_ADMIN' || u.name.includes('Reza') || u.name.includes('Suryadi') || u.memberId === 'mem-nasional-01') {
             localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(DEMO_USERS[0]));
           }
         }
@@ -199,6 +225,16 @@ class StorageService {
 
   public setMembers(members: Member[]) {
     localStorage.setItem(STORAGE_KEYS.MEMBERS, JSON.stringify(members));
+    this.notify();
+  }
+
+  public setTourPackages(tours: TourPackage[]) {
+    localStorage.setItem(STORAGE_KEYS.TOURS, JSON.stringify(tours));
+    this.notify();
+  }
+
+  public setCulinarySouvenirs(items: CulinarySouvenirItem[]) {
+    localStorage.setItem(STORAGE_KEYS.CULINARY_SOUVENIRS, JSON.stringify(items));
     this.notify();
   }
 

@@ -6,7 +6,8 @@ import {
   SAKA_LOGO_DRIVE_DIRECT_URL,
   SAKA_CARD_BG_DRIVE_DIRECT_URL,
   SAKA_CARD_BG_FALLBACK_URL,
-  formatDriveImageUrl
+  formatDriveImageUrl,
+  getDriveDirectFallbackUrl
 } from '../components/common/SakaLogo';
 import { getMemberVerificationUrl } from '../components/member/KtaQrCode';
 
@@ -52,21 +53,33 @@ function loadImage(src: string): Promise<HTMLImageElement> {
       return;
     }
 
+    const primaryUrl = formatDriveImageUrl(src) || src;
     const img = new Image();
     img.crossOrigin = 'anonymous';
     img.onload = () => resolve(img);
     img.onerror = () => {
-      // Retry without crossOrigin if CORS issues occur
-      if (img.crossOrigin) {
+      const fallbackUrl = getDriveDirectFallbackUrl(src);
+      if (fallbackUrl && fallbackUrl !== primaryUrl) {
+        const fallbackImg = new Image();
+        fallbackImg.crossOrigin = 'anonymous';
+        fallbackImg.onload = () => resolve(fallbackImg);
+        fallbackImg.onerror = () => {
+          const rawImg = new Image();
+          rawImg.onload = () => resolve(rawImg);
+          rawImg.onerror = () => resolve(rawImg);
+          rawImg.src = fallbackUrl;
+        };
+        fallbackImg.src = fallbackUrl;
+      } else if (img.crossOrigin) {
         const retryImg = new Image();
         retryImg.onload = () => resolve(retryImg);
         retryImg.onerror = () => resolve(retryImg);
-        retryImg.src = src;
+        retryImg.src = primaryUrl;
       } else {
         resolve(img);
       }
     };
-    img.src = src;
+    img.src = primaryUrl;
   });
 }
 

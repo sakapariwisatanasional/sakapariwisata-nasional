@@ -19,11 +19,47 @@ export const SAKA_CARD_BG_FALLBACK_URL = 'https://drive.google.com/uc?export=vie
 export function formatDriveImageUrl(url?: string): string {
   if (!url) return '';
   const trimmed = url.trim();
-  const match = trimmed.match(/\/d\/([a-zA-Z0-9_-]+)/) || trimmed.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+  if (trimmed.startsWith('data:image') || trimmed.startsWith('blob:')) {
+    return trimmed;
+  }
+  const match = trimmed.match(/\/d\/([a-zA-Z0-9_-]+)/) || 
+                trimmed.match(/[?&]id=([a-zA-Z0-9_-]+)/) ||
+                trimmed.match(/googleusercontent\.com\/d\/([a-zA-Z0-9_-]+)/);
   if (match && match[1]) {
     return `https://lh3.googleusercontent.com/d/${match[1]}`;
   }
   return trimmed;
+}
+
+/**
+ * Fallback direct Google Drive uc download URL in case googleusercontent is blocked
+ */
+export function getDriveDirectFallbackUrl(url?: string): string {
+  if (!url) return '';
+  const trimmed = url.trim();
+  if (trimmed.startsWith('data:image') || trimmed.startsWith('blob:')) {
+    return trimmed;
+  }
+  const match = trimmed.match(/\/d\/([a-zA-Z0-9_-]+)/) || 
+                trimmed.match(/[?&]id=([a-zA-Z0-9_-]+)/) ||
+                trimmed.match(/googleusercontent\.com\/d\/([a-zA-Z0-9_-]+)/);
+  if (match && match[1]) {
+    return `https://drive.google.com/uc?export=view&id=${match[1]}`;
+  }
+  return trimmed;
+}
+
+/**
+ * Return a guaranteed valid avatar URL for a member
+ */
+export function getValidAvatarUrl(url?: string, gender?: string): string {
+  const defaultAvatar = gender === 'PEREMPUAN'
+    ? 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=300&auto=format&fit=crop&q=80'
+    : 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300&auto=format&fit=crop&q=80';
+  
+  if (!url || !url.trim()) return defaultAvatar;
+  const formatted = formatDriveImageUrl(url.trim());
+  return formatted || defaultAvatar;
 }
 
 export const SakaLogo: React.FC<SakaLogoProps> = ({

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   X, 
   UserCheck, 
@@ -19,10 +19,62 @@ import {
   GraduationCap,
   Briefcase,
   Lock,
-  ShieldAlert
+  ShieldAlert,
+  Camera,
+  Upload,
+  Link as LinkIcon,
+  Image as ImageIcon,
+  FolderOpen,
+  ExternalLink
 } from 'lucide-react';
 import { storage } from '../../services/storage';
 import { Member, CurrentUser, Province, Regency, District, Branch, KridaType, MemberStatus } from '../../types';
+import { formatDriveImageUrl, getDriveDirectFallbackUrl, getValidAvatarUrl } from '../common/SakaLogo';
+import { GOOGLE_DRIVE_MAIN_FOLDER } from '../../services/driveRepository';
+
+// Koleksi preset pas foto resmi berlatar belakang standar KTA / Pramuka
+const OFFICIAL_PRESETS = [
+  {
+    name: 'Seragam Pramuka Pria (Latar Merah)',
+    gender: 'Laki-laki',
+    url: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=500&auto=format&fit=crop&q=80'
+  },
+  {
+    name: 'Seragam Pramuka Pria (Latar Biru)',
+    gender: 'Laki-laki',
+    url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=500&auto=format&fit=crop&q=80'
+  },
+  {
+    name: 'Seragam Saka Wanita (Latar Merah)',
+    gender: 'Perempuan',
+    url: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=500&auto=format&fit=crop&q=80'
+  },
+  {
+    name: 'Seragam Saka Wanita Berhijab',
+    gender: 'Perempuan',
+    url: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=500&auto=format&fit=crop&q=80'
+  },
+  {
+    name: 'Seragam Pembina Pria',
+    gender: 'Laki-laki',
+    url: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=500&auto=format&fit=crop&q=80'
+  },
+  {
+    name: 'Seragam Pimpinan Saka',
+    gender: 'Laki-laki',
+    url: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=500&auto=format&fit=crop&q=80'
+  },
+  {
+    name: 'Seragam Pramuka Putri (Latar Biru)',
+    gender: 'Perempuan',
+    url: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=500&auto=format&fit=crop&q=80'
+  },
+  {
+    name: 'Seragam Saka Pariwisata Muda',
+    gender: 'Laki-laki',
+    url: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=500&auto=format&fit=crop&q=80'
+  }
+];
 
 interface AdminEditMemberModalProps {
   isOpen: boolean;
@@ -74,12 +126,47 @@ export const AdminEditMemberModal: React.FC<AdminEditMemberModalProps> = ({
   const [nationalMemberNumber, setNationalMemberNumber] = useState('');
   const [autoRegenerateNta, setAutoRegenerateNta] = useState(false);
 
+  // Pas Foto KTA State
+  const [avatarUrl, setAvatarUrl] = useState('');
+  const [customPhotoUrl, setCustomPhotoUrl] = useState('');
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const photoFileInputRef = useRef<HTMLInputElement>(null);
+
   // Administrative Notes
   const [updateReason, setUpdateReason] = useState('Koreksi penulisan nama, gelar, dan penyesuaian domisili');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Active Tab
-  const [activeTab, setActiveTab] = useState<'IDENTITY' | 'DOMICILE' | 'SAKA' | 'REASON'>('IDENTITY');
+  const [activeTab, setActiveTab] = useState<'IDENTITY' | 'PHOTO' | 'DOMICILE' | 'SAKA' | 'REASON'>('IDENTITY');
+
+  // Handle Photo File Upload
+  const handlePhotoFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      alert('Mohon pilih file gambar yang valid (JPG/PNG).');
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      alert('Ukuran file maksimal 5MB.');
+      return;
+    }
+
+    setIsUploadingPhoto(true);
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const base64 = event.target?.result as string;
+      setAvatarUrl(base64);
+      setIsUploadingPhoto(false);
+    };
+    reader.onerror = () => {
+      alert('Gagal memproses file foto.');
+      setIsUploadingPhoto(false);
+    };
+    reader.readAsDataURL(file);
+  };
 
   // Load Territory Data
   useEffect(() => {
@@ -97,6 +184,9 @@ export const AdminEditMemberModal: React.FC<AdminEditMemberModalProps> = ({
       setPhone(member.phone || '');
       setEmail(member.email || '');
       setAddress(member.address || '');
+
+      setAvatarUrl(member.avatarUrl || '');
+      setCustomPhotoUrl(member.avatarUrl?.startsWith('http') ? member.avatarUrl : '');
 
       setSelectedProvinceId(member.provinceId || '32');
       setSelectedRegencyId(member.regencyId || '32.06');
@@ -242,6 +332,8 @@ export const AdminEditMemberModal: React.FC<AdminEditMemberModalProps> = ({
         occupation: occupation.trim(),
         bio: bio.trim(),
 
+        avatarUrl: avatarUrl.trim() || member.avatarUrl,
+
         nationalMemberNumber: finalNta || member.nationalMemberNumber
       };
 
@@ -376,6 +468,22 @@ export const AdminEditMemberModal: React.FC<AdminEditMemberModalProps> = ({
 
           <button
             type="button"
+            onClick={() => setActiveTab('PHOTO')}
+            className={`px-4 py-2.5 text-xs font-bold border-b-2 transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
+              activeTab === 'PHOTO'
+                ? 'border-purple-900 text-purple-950 bg-white rounded-t-xl shadow-xs'
+                : 'border-transparent text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            <Camera className="w-3.5 h-3.5 text-emerald-600" />
+            <span>2. Pas Foto KTA</span>
+            {avatarUrl && (
+              <span className="w-2 h-2 rounded-full bg-emerald-500" />
+            )}
+          </button>
+
+          <button
+            type="button"
             onClick={() => setActiveTab('DOMICILE')}
             className={`px-4 py-2.5 text-xs font-bold border-b-2 transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
               activeTab === 'DOMICILE'
@@ -384,7 +492,7 @@ export const AdminEditMemberModal: React.FC<AdminEditMemberModalProps> = ({
             }`}
           >
             <MapPin className="w-3.5 h-3.5" />
-            <span>2. Domisili & Kwartir</span>
+            <span>3. Domisili & Kwartir</span>
           </button>
 
           <button
@@ -397,7 +505,7 @@ export const AdminEditMemberModal: React.FC<AdminEditMemberModalProps> = ({
             }`}
           >
             <Award className="w-3.5 h-3.5" />
-            <span>3. Krida & Status KTA</span>
+            <span>4. Krida & Status KTA</span>
           </button>
 
           <button
@@ -410,7 +518,7 @@ export const AdminEditMemberModal: React.FC<AdminEditMemberModalProps> = ({
             }`}
           >
             <FileText className="w-3.5 h-3.5" />
-            <span>4. Catatan Perubahan</span>
+            <span>5. Catatan Perubahan</span>
           </button>
         </div>
 
@@ -425,6 +533,36 @@ export const AdminEditMemberModal: React.FC<AdminEditMemberModalProps> = ({
                 <p className="text-[11px] leading-relaxed">
                   Perubahan nama lengkap dan gelar akan langsung otomatis diperbarui pada <strong>Kartu Tanda Anggota (KTA) Digital</strong>, <strong>sertifikat keahlian</strong>, dan <strong>dokumen cetak PDF</strong>.
                 </p>
+              </div>
+
+              {/* Photo Shortcut in Tab 1 */}
+              <div className="p-3 bg-purple-50/70 border border-purple-200/80 rounded-2xl flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="relative w-12 h-14 rounded-xl overflow-hidden border-2 border-purple-500/60 bg-slate-900 flex-shrink-0 shadow-xs">
+                    <img
+                      src={formatDriveImageUrl(avatarUrl) || avatarUrl || getValidAvatarUrl(avatarUrl, gender)}
+                      alt="Pas Foto"
+                      className="w-full h-full object-cover"
+                      referrerPolicy="no-referrer"
+                      onError={(e) => {
+                        const img = e.target as HTMLImageElement;
+                        img.src = getValidAvatarUrl('', gender);
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <p className="font-bold text-slate-900 text-xs">Pas Foto Resmi KTA</p>
+                    <p className="text-[10px] text-slate-500">Pas foto standar format 3x4 berseragam resmi</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('PHOTO')}
+                  className="px-3 py-1.5 bg-purple-900 hover:bg-purple-800 text-white rounded-xl font-bold text-[11px] flex items-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <Camera className="w-3.5 h-3.5" />
+                  <span>Ubah Pas Foto</span>
+                </button>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -520,6 +658,155 @@ export const AdminEditMemberModal: React.FC<AdminEditMemberModalProps> = ({
                     placeholder="Pengalaman, ketertarikan wisata, atau deskripsi singkat..."
                     className="w-full px-3.5 py-2 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 outline-none text-slate-800 resize-none"
                   />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 2: PAS FOTO KTA */}
+          {activeTab === 'PHOTO' && (
+            <div className="space-y-5 animate-in fade-in duration-100">
+              <div className="bg-emerald-50 border border-emerald-200/80 rounded-2xl p-3 flex items-start gap-2.5 text-emerald-900">
+                <Sparkles className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" />
+                <p className="text-[11px] leading-relaxed">
+                  Pas foto anggota ini akan langsung ditampilkan di <strong>Kartu Tanda Anggota (KTA) Digital</strong>, <strong>Halaman Utama (Landing Page)</strong>, dan <strong>Direktori Pemandu Berkompeten</strong>.
+                </p>
+              </div>
+
+              {/* Main Photo Editor Box */}
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-5 items-start">
+                
+                {/* Left: 3x4 Photo Preview Frame */}
+                <div className="md:col-span-4 flex flex-col items-center p-4 bg-slate-900 rounded-2xl border border-slate-800 text-white shadow-md">
+                  <div className="text-[11px] font-bold text-slate-300 mb-2 flex items-center gap-1.5">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Pratinjau KTA 3x4</span>
+                  </div>
+                  
+                  <div className="relative w-32 h-44 rounded-2xl overflow-hidden border-2 border-emerald-400/80 shadow-2xl bg-slate-950 flex items-center justify-center">
+                    <img
+                      src={formatDriveImageUrl(avatarUrl) || avatarUrl || getValidAvatarUrl(avatarUrl, gender)}
+                      alt="Pas Foto Anggota"
+                      className="w-full h-full object-cover"
+                      referrerPolicy="no-referrer"
+                      onError={(e) => {
+                        const img = e.target as HTMLImageElement;
+                        const fallback = getDriveDirectFallbackUrl(avatarUrl);
+                        if (fallback && img.src !== fallback) {
+                          img.src = fallback;
+                        } else {
+                          img.src = getValidAvatarUrl('', gender);
+                        }
+                      }}
+                    />
+                    {isUploadingPhoto && (
+                      <div className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center text-white text-xs font-bold gap-2">
+                        <div className="w-6 h-6 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin" />
+                        <span>Memproses...</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <span className="mt-2 text-[10px] text-emerald-400 font-semibold">
+                    Format Standar KTA Resmi
+                  </span>
+                </div>
+
+                {/* Right: Upload, Link, & Presets */}
+                <div className="md:col-span-8 space-y-4">
+                  {/* Action 1: Upload File */}
+                  <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl space-y-2">
+                    <span className="font-bold text-slate-800 text-xs flex items-center gap-1.5">
+                      <Upload className="w-3.5 h-3.5 text-purple-700" />
+                      <span>1. Upload File Foto Langsung (JPG / PNG)</span>
+                    </span>
+                    <input
+                      type="file"
+                      ref={photoFileInputRef}
+                      onChange={handlePhotoFileUpload}
+                      accept="image/jpeg,image/png,image/webp"
+                      className="hidden"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => photoFileInputRef.current?.click()}
+                      disabled={isUploadingPhoto}
+                      className="w-full py-2.5 px-4 bg-white hover:bg-slate-100 text-purple-950 font-bold border border-purple-300 rounded-xl shadow-xs flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                    >
+                      <Camera className="w-4 h-4 text-purple-700" />
+                      <span>{isUploadingPhoto ? 'Mengunggah...' : 'Pilih Foto dari Galeri / Komputer'}</span>
+                    </button>
+                    <p className="text-[10px] text-slate-500">Maksimal 5MB. Direkomendasikan rasio 3:4 dengan pakaian rapi / seragam.</p>
+                  </div>
+
+                  {/* Action 2: Google Drive / Direct Image URL */}
+                  <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl space-y-2">
+                    <span className="font-bold text-slate-800 text-xs flex items-center gap-1.5">
+                      <LinkIcon className="w-3.5 h-3.5 text-indigo-700" />
+                      <span>2. Tautan Google Drive / URL Gambar</span>
+                    </span>
+                    <div className="flex gap-2">
+                      <input
+                        type="url"
+                        value={customPhotoUrl}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setCustomPhotoUrl(val);
+                          if (val.trim()) {
+                            setAvatarUrl(val.trim());
+                          }
+                        }}
+                        placeholder="https://drive.google.com/file/d/... atau https://..."
+                        className="flex-1 px-3 py-2 bg-white border border-slate-300 rounded-xl outline-none focus:ring-2 focus:ring-purple-500/20 text-xs font-mono"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (customPhotoUrl.trim()) {
+                            setAvatarUrl(formatDriveImageUrl(customPhotoUrl.trim()));
+                          }
+                        }}
+                        className="px-3 py-2 bg-indigo-900 hover:bg-indigo-800 text-white rounded-xl font-bold text-xs cursor-pointer"
+                      >
+                        Terapkan
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Action 3: Official Preset Selector */}
+                  <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl space-y-2">
+                    <span className="font-bold text-slate-800 text-xs flex items-center gap-1.5">
+                      <ImageIcon className="w-3.5 h-3.5 text-amber-700" />
+                      <span>3. Preset Resmi Pas Foto Seragam Pramuka / Saka</span>
+                    </span>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                      {OFFICIAL_PRESETS.map((preset, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => {
+                            setAvatarUrl(preset.url);
+                            setCustomPhotoUrl(preset.url);
+                          }}
+                          className={`p-1.5 rounded-xl border text-left flex flex-col items-center gap-1 transition-all cursor-pointer ${
+                            avatarUrl === preset.url
+                              ? 'bg-purple-100 border-purple-600 ring-2 ring-purple-600/30'
+                              : 'bg-white border-slate-200 hover:border-purple-300'
+                          }`}
+                        >
+                          <img
+                            src={preset.url}
+                            alt={preset.name}
+                            className="w-12 h-16 object-cover rounded-lg shadow-xs"
+                            referrerPolicy="no-referrer"
+                          />
+                          <span className="text-[9px] font-bold text-slate-700 text-center line-clamp-1">
+                            {preset.name}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>

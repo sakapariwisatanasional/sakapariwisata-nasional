@@ -75,51 +75,157 @@ class SpreadsheetService {
   }
 
   /**
+   * Helper untuk membersihkan dan memformat link gambar Google Drive
+   */
+  private cleanDriveImageUrl(raw?: string): string {
+    if (!raw || typeof raw !== 'string') return '';
+    const trimmed = raw.trim();
+    if (!trimmed) return '';
+    if (trimmed.startsWith('data:image') || trimmed.startsWith('blob:')) return trimmed;
+    const match = trimmed.match(/\/file\/d\/([a-zA-Z0-9_-]+)/) ||
+                  trimmed.match(/\/d\/([a-zA-Z0-9_-]+)/) || 
+                  trimmed.match(/[?&]id=([a-zA-Z0-9_-]+)/) ||
+                  trimmed.match(/googleusercontent\.com\/d\/([a-zA-Z0-9_-]+)/);
+    if (match && match[1]) {
+      return `https://lh3.googleusercontent.com/d/${match[1]}`;
+    }
+    return trimmed;
+  }
+
+  /**
+   * Helper pencarian nilai kolom yang fleksibel (case-insensitive, abaikan spasi & karakter khusus)
+   */
+  private getRowValue(row: Record<string, any>, aliases: string[]): string {
+    if (!row) return '';
+    // 1. Coba pencarian langsung
+    for (const a of aliases) {
+      if (row[a] !== undefined && row[a] !== null && String(row[a]).trim() !== '') {
+        return String(row[a]).trim();
+      }
+    }
+    // 2. Coba pencarian dengan normalisasi kunci (abaikan huruf besar/kecil, spasi, underscore)
+    const keys = Object.keys(row);
+    for (const a of aliases) {
+      const cleanA = a.toLowerCase().replace(/[^a-z0-9]/g, '');
+      for (const k of keys) {
+        const cleanK = k.toLowerCase().replace(/[^a-z0-9]/g, '');
+        if (cleanK === cleanA) {
+          const v = row[k];
+          if (v !== undefined && v !== null && String(v).trim() !== '') {
+            return String(v).trim();
+          }
+        }
+      }
+    }
+    return '';
+  }
+
+  /**
+   * Helper penormalisasi nomor telepon/WhatsApp
+   */
+  private normalizePhoneNumber(raw?: string): string {
+    if (!raw) return '081234567890';
+    let str = String(raw).trim();
+    if (str.endsWith('.0')) str = str.substring(0, str.length - 2);
+    let digits = str.replace(/\D/g, '');
+    if (digits.startsWith('62')) {
+      digits = '0' + digits.substring(2);
+    } else if (!digits.startsWith('0') && digits.length >= 9) {
+      digits = '0' + digits;
+    }
+    return digits || str;
+  }
+
+  /**
+   * Helper pengonversi tanggal format GVIZ Date(yyyy,m,d) atau ISO
+   */
+  private parseGvizDate(val: any): string {
+    if (!val) return new Date().toISOString().split('T')[0];
+    const str = String(val).trim();
+    const match = str.match(/Date\((\d+),\s*(\d+),\s*(\d+)/i);
+    if (match) {
+      const y = parseInt(match[1], 10);
+      const m = parseInt(match[2], 10) + 1;
+      const d = parseInt(match[3], 10);
+      return `${y}-${m.toString().padStart(2, '0')}-${d.toString().padStart(2, '0')}`;
+    }
+    if (str.includes('T')) return str.split('T')[0];
+    return str;
+  }
+
+  /**
    * Mengambil data mentah baris dari Google Spreadsheet menggunakan Google Visualization API
    */
   public async fetchSheetRows(sheetName: string = 'Anggota'): Promise<Record<string, any>[]> {
     const spreadsheetId = this.config.spreadsheetId || DEFAULT_SPREADSHEET_ID;
-    
-    // 1. Coba Google Visualization Table Query API (format JSONP / out:json)
-    const gvizUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(sheetName)}`;
-    
-    try {
-      const response = await fetch(gvizUrl);
-      if (!response.ok) {
-        throw new Error(`HTTP error ${response.status}: ${response.statusText}`);
-      }
 
-      const text = await response.text();
-      
-      // Google Visualization mengembalikan format: /*O_o*/\ngoogle.visualization.Query.setResponse({...});
-      const jsonStart = text.indexOf('{');
-      const jsonEnd = text.lastIndexOf('}');
-      
-      if (jsonStart !== -1 && jsonEnd !== -1) {
-        const jsonStr = text.substring(jsonStart, jsonEnd + 1);
-        const data = JSON.parse(jsonStr);
+    // Daftar variasi nama sheet yang mungkin digunakan
+    const sheetCandidates: string[] = [sheetName];
+    if (sheetName.toLowerCase().includes('anggota')) {
+      sheetCandidates.push('Data Anggota', 'Data_Anggota', 'Members', 'Anggota Saka', 'Pendaftaran', 'Form Responses 1', 'Respon Formulir 1', '');
+    } else if (sheetName.toLowerCase().includes('paket') || sheetName.toLowerCase().includes('wisata')) {
+      sheetCandidates.push('Paket_Wisata', 'Paket Wisata', 'Tours', 'Tour_Packages');
+    } else if (sheetName.toLowerCase().includes('kuliner') || sheetName.toLowerCase().includes('cinderamata')) {
+      sheetCandidates.push('Kuliner_Cinderamata', 'Kuliner & Cinderamata', 'Produk', 'Products', 'Souvenirs');
+    } else if (sheetName.toLowerCase().includes('agenda') || sheetName.toLowerCase().includes('kegiatan')) {
+      sheetCandidates.push('Agenda_Kegiatan', 'Agenda & Kegiatan', 'Events', 'Activities');
+    }
+
+    for (const targetSheet of sheetCandidates) {
+      try {
+        const sheetParam = targetSheet ? `&sheet=${encodeURIComponent(targetSheet)}` : '';
+        const gvizUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:json${sheetParam}`;
         
-        if (data.table && data.table.cols && data.table.rows) {
-          const cols: string[] = data.table.cols.map((col: any, idx: number) => {
-            return (col.label && col.label.trim()) || `col_${idx}`;
-          });
+        const response = await fetch(gvizUrl);
+        if (!response.ok) continue;
 
-          const results = data.table.rows.map((row: any) => {
-            const item: Record<string, any> = {};
-            if (row.c) {
-              row.c.forEach((cell: any, idx: number) => {
-                const key = cols[idx] || `col_${idx}`;
-                item[key] = cell ? (cell.v !== null ? cell.v : cell.f || '') : '';
+        const text = await response.text();
+        const jsonStart = text.indexOf('{');
+        const jsonEnd = text.lastIndexOf('}');
+        
+        if (jsonStart !== -1 && jsonEnd !== -1) {
+          const jsonStr = text.substring(jsonStart, jsonEnd + 1);
+          const data = JSON.parse(jsonStr);
+          
+          if (data.table && data.table.rows && data.table.rows.length > 0) {
+            let cols: string[] = (data.table.cols || []).map((col: any, idx: number) => {
+              return (col && col.label && col.label.trim()) || `col_${idx}`;
+            });
+
+            let dataRows = data.table.rows;
+
+            // Jika label cols generic (seperti col_0, col_1) dan baris pertama berisi header teks
+            const firstRowHasHeaders = cols.every(c => c.startsWith('col_') || !c) && 
+              dataRows.length > 0 && 
+              dataRows[0].c && 
+              dataRows[0].c.some((cell: any) => cell && typeof cell.v === 'string' && (cell.v.toLowerCase().includes('nama') || cell.v.toLowerCase().includes('kta') || cell.v.toLowerCase().includes('id')));
+
+            if (firstRowHasHeaders) {
+              cols = dataRows[0].c.map((cell: any, idx: number) => {
+                return (cell && (cell.v || cell.f) && String(cell.v || cell.f).trim()) || `col_${idx}`;
               });
+              dataRows = dataRows.slice(1);
             }
-            return item;
-          });
 
-          return results;
+            const results = dataRows.map((row: any) => {
+              const item: Record<string, any> = {};
+              if (row.c) {
+                row.c.forEach((cell: any, idx: number) => {
+                  const key = cols[idx] || `col_${idx}`;
+                  item[key] = cell ? (cell.v !== null && cell.v !== undefined ? cell.v : cell.f || '') : '';
+                });
+              }
+              return item;
+            }).filter((r: any) => Object.values(r).some(v => v !== '' && v !== null && v !== undefined));
+
+            if (results.length > 0) {
+              return results;
+            }
+          }
         }
+      } catch (err: any) {
+        console.warn(`GVIZ fetch candidate "${targetSheet}" error:`, err?.message || err);
       }
-    } catch (err: any) {
-      console.warn(`GVIZ fetch failed for sheet "${sheetName}", trying CSV fallback:`, err.message);
     }
 
     // 2. Fallback: Coba CSV Export URL
@@ -128,10 +234,11 @@ class SpreadsheetService {
       const response = await fetch(csvUrl);
       if (response.ok) {
         const csvText = await response.text();
-        return this.parseCSV(csvText);
+        const parsed = this.parseCSV(csvText);
+        if (parsed.length > 0) return parsed;
       }
     } catch (csvErr: any) {
-      console.error('CSV fetch failed:', csvErr);
+      console.error('CSV fetch fallback failed:', csvErr);
     }
 
     return [];
@@ -196,17 +303,21 @@ class SpreadsheetService {
     this.saveConfig({ status: 'SYNCING' });
 
     try {
+      // 1. Sinkronisasi Data Anggota
       const rows = await this.fetchSheetRows('Anggota');
+      let memberCount = 0;
+      let addedMemberCount = 0;
       
       if (rows && rows.length > 0) {
         const existingMembers = storage.getMembers();
         const existingUsers = storage.getUsers();
-        let addedCount = 0;
 
-        const parseRole = (roleStr?: string): UserRole => {
-          if (!roleStr) return 'MEMBER';
-          const r = roleStr.toUpperCase().replace(/\s+/g, '_');
-          if (r.includes('SUPER') || r.includes('NASIONAL') || r.includes('PIMPINAN_NASIONAL') || r === 'SUPER_ADMIN') {
+        const parseRole = (roleStr?: string, prov?: string, kab?: string): UserRole => {
+          const r = (roleStr || '').toUpperCase().replace(/\s+/g, '_');
+          const p = (prov || '').toUpperCase();
+          const k = (kab || '').toUpperCase();
+
+          if (r.includes('SUPER') || r.includes('NASIONAL') || r.includes('PIMPINAN_NASIONAL') || r === 'SUPER_ADMIN' || p.includes('NASIONAL') || k.includes('KWARTIR NASIONAL')) {
             return 'SUPER_ADMIN';
           }
           if (r.includes('KWARDA') || r.includes('PROVINSI') || r === 'ADMIN_PROVINCE') {
@@ -223,21 +334,21 @@ class SpreadsheetService {
 
         // Petakan baris spreadsheet ke model Member
         const importedMembers: Member[] = rows.map((row, idx) => {
-          const fullName = row['Nama Lengkap'] || row['nama_lengkap'] || row['Nama'] || row['col_1'] || `Anggota ${idx + 1}`;
-          const kta = row['Nomor Anggota'] || row['Nomor KTA'] || row['nomor_kta'] || row['col_0'] || '';
-          const province = row['Provinsi'] || row['Kwarda'] || row['provinsi'] || 'DKI Jakarta';
-          const regency = row['Kabupaten/Kota'] || row['Kwarcab'] || row['kabupaten'] || 'Jakarta Selatan';
-          const branch = row['Kwartir Ranting'] || row['Kwarran'] || row['kecamatan_ranting'] || 'Kwarran Kebayoran Baru';
-          const krida = row['Krida'] || row['krida'] || 'Krida Pemandu';
-          const gudep = row['Gugus Depan'] || row['Gudep'] || row['gudep'] || 'Gudep 01.001';
-          const email = row['Email'] || row['email'] || `member${idx + 1}@pramuka.id`;
-          const phone = row['Nomor WA'] || row['No WhatsApp'] || row['Telepon'] || row['col_4'] || '081234567890';
-          const status = (row['Status'] || row['status'] || 'ACTIVE').toUpperCase();
-          const avatarUrl = row['Foto URL'] || row['foto_url'] || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&fit=crop&q=80';
-          const roleRaw = row['Role'] || row['Peran'] || row['Jabatan'] || row['Hak Akses'] || row['Wewenang'] || '';
-          const role = parseRole(roleRaw);
-
-          const memberId = row['ID'] || row['id'] || `sheet-member-${Date.now()}-${idx}`;
+          const fullName = this.getRowValue(row, ['Nama Lengkap', 'nama_lengkap', 'Nama', 'nama', 'Full Name', 'fullname', 'Name', 'col_1']) || `Anggota ${idx + 1}`;
+          const kta = this.getRowValue(row, ['Nomor KTA', 'Nomor Anggota', 'nomor_kta', 'NTA', 'KTA', 'No KTA', 'No. KTA', 'Nomor NTA', 'col_2', 'col_0']);
+          const province = this.getRowValue(row, ['Provinsi', 'Kwarda', 'provinsi', 'Kwartir Daerah', 'Daerah', 'Province', 'col_3']) || 'Tingkat Nasional';
+          const regency = this.getRowValue(row, ['Kabupaten/Kota', 'Kwarcab', 'kabupaten', 'Kabupaten', 'Kota', 'Kwartir Cabang', 'col_4']) || 'Kwartir Nasional';
+          const branch = this.getRowValue(row, ['Kwarran/Kecamatan', 'Kwartir Ranting', 'Kwarran', 'kecamatan_ranting', 'Kecamatan', 'Ranting', 'col_5']) || 'Pimpinan Nasional';
+          const gudep = this.getRowValue(row, ['Gugus Depan', 'Gudep', 'gudep', 'Gugusdepan', 'col_6']) || 'Gudep Saka Pariwisata';
+          const krida = this.getRowValue(row, ['Krida', 'krida', 'Peminatan Krida', 'col_7']) || 'Krida Pemandu';
+          const statusRaw = (this.getRowValue(row, ['Status', 'status', 'col_8']) || 'ACTIVE').toUpperCase();
+          const phone = this.normalizePhoneNumber(this.getRowValue(row, ['Nomor WA', 'No WhatsApp', 'Nomor WhatsApp', 'No WA', 'WhatsApp', 'Telepon', 'Phone', 'col_9']));
+          const email = this.getRowValue(row, ['Email', 'email', 'E-mail', 'col_10']) || `member${idx + 1}@pramuka.id`;
+          const rawPhoto = this.getRowValue(row, ['Foto URL', 'foto_url', 'Foto', 'Pas Foto', 'Photo', 'Avatar', 'Link Foto', 'col_11']);
+          const avatarUrl = this.cleanDriveImageUrl(rawPhoto) || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&fit=crop&q=80';
+          const roleRaw = this.getRowValue(row, ['Role', 'Peran', 'Jabatan', 'Hak Akses', 'Wewenang', 'Posisi']);
+          const role = parseRole(roleRaw, province, regency);
+          const memberId = this.getRowValue(row, ['ID', 'id', 'Id', 'member_id', 'Nomor ID', 'col_0']) || `sheet-member-${idx}`;
 
           return {
             id: memberId,
@@ -252,65 +363,76 @@ class SpreadsheetService {
             email,
             phone,
             address: `${branch}, ${regency}, ${province}`,
-            provinceId: '31',
+            provinceId: '00',
             provinceName: province,
-            regencyId: '31.71',
+            regencyId: '00.00',
             regencyName: regency,
-            districtId: '31.71.01',
+            districtId: '00.00.00',
             districtName: branch,
             branchId: `branch-${idx}`,
             branchName: branch,
             gugusDepan: gudep,
-            currentPosition: `Anggota ${krida}`,
+            currentPosition: role === 'SUPER_ADMIN' ? 'Ketua Pimpinan Saka Pariwisata Nasional' : `Anggota ${krida}`,
             krida: krida as any,
             joinYear: new Date().getFullYear(),
             educationLevel: 'SMA/SMK',
             occupation: 'Anggota Pramuka',
-            bio: `Anggota Saka Pariwisata ${province}. Terdaftar dari Google Spreadsheet.`,
-            status: status === 'ACTIVE' || status === 'PENDING' ? status : 'ACTIVE',
-            registeredAt: new Date().toISOString(),
-            verificationToken: `VERIFY-SP-${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
+            bio: `Anggota resmi Saka Pariwisata ${province}. Terdata langsung dari Google Spreadsheet.`,
+            status: statusRaw === 'ACTIVE' || statusRaw === 'PENDING' ? statusRaw : 'ACTIVE',
+            registeredAt: this.getRowValue(row, ['Tanggal Daftar', 'tanggal_daftar', 'Created At', 'Timestamp', 'col_13']) || new Date().toISOString(),
+            verificationToken: `VERIFY-SP-${kta ? kta.replace(/\./g, '') : memberId}`,
             isOperator: role !== 'MEMBER',
             operatorRole: role !== 'MEMBER' ? role : undefined,
-            operatorJurisdictionName: role === 'ADMIN_PROVINCE' ? province : role === 'ADMIN_REGENCY' ? regency : role === 'ADMIN_BRANCH' ? branch : undefined,
+            operatorJurisdictionName: role === 'SUPER_ADMIN' ? 'Kwartir Nasional' : role === 'ADMIN_PROVINCE' ? province : role === 'ADMIN_REGENCY' ? regency : role === 'ADMIN_BRANCH' ? branch : undefined,
             skills: [],
             certifications: [],
             locationHistory: []
           };
         });
 
-        // Simpan ke storage jika ada data valid
+        // Gabungkan dan perbarui anggota di database lokal
         if (importedMembers.length > 0) {
-          // Gabungkan dengan anggota yang sudah ada (hindari duplikat ID, KTA, atau Email)
           const merged = [...existingMembers];
           const mergedUsers = [...existingUsers];
 
           importedMembers.forEach((newM, idx) => {
             const rawRow = rows[idx] || {};
-            const password = rawRow['Password'] || rawRow['Kata Sandi'] || rawRow['Kata_Sandi'] || rawRow['password'] || '';
-            const username = rawRow['Username'] || rawRow['username'] || newM.email.split('@')[0];
-            const parsedRole = newM.operatorRole || (parseRole(rawRow['Role'] || rawRow['Peran']) || 'MEMBER');
+            const password = this.getRowValue(rawRow, ['Password', 'Kata Sandi', 'Kata_Sandi', 'password']);
+            const username = this.getRowValue(rawRow, ['Username', 'username']) || (newM.email ? newM.email.split('@')[0] : `user_${idx}`);
+            const parsedRole = newM.operatorRole || 'MEMBER';
 
-            const exists = merged.some(m => 
-              (newM.nationalMemberNumber && m.nationalMemberNumber === newM.nationalMemberNumber) || 
+            // Cari apakah member sudah ada di database
+            const existingIdx = merged.findIndex(m => 
               m.id === newM.id ||
+              (newM.nationalMemberNumber && m.nationalMemberNumber && m.nationalMemberNumber.trim() === newM.nationalMemberNumber.trim()) ||
               (newM.email && m.email && m.email.toLowerCase().trim() === newM.email.toLowerCase().trim())
             );
-            if (!exists) {
+
+            if (existingIdx !== -1) {
+              // Update in place
+              merged[existingIdx] = {
+                ...merged[existingIdx],
+                ...newM,
+                skills: (merged[existingIdx].skills && merged[existingIdx].skills.length > 0) ? merged[existingIdx].skills : newM.skills,
+                certifications: (merged[existingIdx].certifications && merged[existingIdx].certifications.length > 0) ? merged[existingIdx].certifications : newM.certifications,
+              };
+            } else {
+              // Tambahkan anggota baru
               merged.push(newM);
-              addedCount++;
+              addedMemberCount++;
             }
 
-            // Sync User record for login
+            // Sync akun user untuk autentikasi
             const userIdx = mergedUsers.findIndex(u => 
               (newM.email && u.email && u.email.toLowerCase().trim() === newM.email.toLowerCase().trim()) || 
               (u.memberId && u.memberId === newM.id) || 
-              (u.username && u.username === username)
+              (u.username && u.username.toLowerCase() === username.toLowerCase())
             );
+
             const userObj: CurrentUser = {
               id: newM.userId,
               username: username,
-              password: password || undefined,
+              password: password || 'sakapariwisata',
               email: newM.email,
               name: newM.fullName,
               role: parsedRole,
@@ -329,20 +451,148 @@ class SpreadsheetService {
 
           storage.setMembers(merged);
           storage.setUsers(mergedUsers);
-          storage.deduplicateDatabase();
+          memberCount = importedMembers.length;
         }
-
-        const successMsg = `Berhasil menyinkronkan database spreadsheet. ${rows.length} data baris terbaca (${addedCount} data baru ditambahkan).`;
-        this.saveConfig({
-          lastSyncedAt: new Date().toISOString(),
-          status: 'CONNECTED',
-          lastError: undefined
-        });
-
-        this.isSyncing = false;
-        return { success: true, count: rows.length, message: successMsg };
       }
 
+      // 2. Sinkronisasi Data Paket Wisata jika sheet tersedia
+      try {
+        const tourRows = await this.fetchSheetRows('Paket_Wisata');
+        if (tourRows && tourRows.length > 0) {
+          const existingTours = storage.getTourPackages();
+          const mergedTours = [...existingTours];
+
+          tourRows.forEach((row, idx) => {
+            const tourId = this.getRowValue(row, ['ID', 'id', 'col_0']) || `tour-sheet-${idx}`;
+            const title = this.getRowValue(row, ['Nama Paket', 'title', 'col_1']) || `Paket Wisata ${idx + 1}`;
+            const category = this.getRowValue(row, ['Kategori', 'category', 'col_2']) || 'Ekowisata';
+            const price = parseFloat(this.getRowValue(row, ['Harga', 'price', 'col_3'])) || 350000;
+            const duration = parseInt(this.getRowValue(row, ['Durasi (Hari)', 'duration', 'col_4']), 10) || 1;
+            const location = this.getRowValue(row, ['Lokasi', 'location', 'col_5']) || '';
+            const prov = this.getRowValue(row, ['Provinsi', 'province', 'col_6']) || 'Jawa Barat';
+            const reg = this.getRowValue(row, ['Kabupaten/Kota', 'regency', 'col_7']) || 'Kabupaten Bandung';
+            const organizer = this.getRowValue(row, ['Penyelenggara', 'organizer', 'col_8']) || 'Saka Pariwisata';
+            const phone = this.normalizePhoneNumber(this.getRowValue(row, ['Kontak WA', 'phone', 'col_9']));
+            const banner = this.cleanDriveImageUrl(this.getRowValue(row, ['Foto Banner', 'image', 'col_10'])) || 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=1200&auto=format&fit=crop&q=80';
+
+            const tourObj: TourPackage = {
+              id: tourId,
+              title,
+              slug: tourId,
+              category: (category as any) || 'Ekowisata',
+              pricePerPerson: price,
+              durationDays: duration,
+              locationAddress: location,
+              provinceId: '32',
+              provinceName: prov,
+              regencyId: '32.04',
+              regencyName: reg,
+              districtName: 'Wilayah Saka',
+              ownerType: 'MEMBER',
+              ownerId: 'mem-jabar-01',
+              ownerName: organizer,
+              contactPhone: phone,
+              contactEmail: 'info@sakapariwisata.id',
+              coverImage: banner,
+              galleryImages: [banner],
+              description: `Paket wisata edukasi dan petualangan ${title}. Dipandu oleh kader Pramuka Saka Pariwisata tersertifikasi.`,
+              facilities: ['Pemandu Wisata Saka Pariwisata BNSP', 'Tiket Masuk Destinasi', 'Dokumentasi', 'Asuransi'],
+              minCapacity: 2,
+              maxCapacity: 30,
+              guideProvided: true,
+              itinerary: [
+                {
+                  day: 1,
+                  title: 'Eksplorasi dan Edukasi Saka Pariwisata',
+                  description: 'Kunjungan destinasi, observasi potensi lokal, dan pendampingan pemandu pramuka.'
+                }
+              ],
+              status: 'APPROVED_PUBLISHED',
+              submittedAt: new Date().toISOString(),
+              viewsCount: 15,
+              featured: true
+            };
+
+            const existingIdx = mergedTours.findIndex(t => t.id === tourId || t.title.toLowerCase() === title.toLowerCase());
+            if (existingIdx !== -1) {
+              mergedTours[existingIdx] = { ...mergedTours[existingIdx], ...tourObj };
+            } else {
+              mergedTours.push(tourObj);
+            }
+          });
+
+          storage.setTourPackages(mergedTours);
+        }
+      } catch (e) {
+        console.warn('Tour packages sync notice:', e);
+      }
+
+      // 3. Sinkronisasi Data Kuliner & Cinderamata jika sheet tersedia
+      try {
+        const culinaryRows = await this.fetchSheetRows('Kuliner_Cinderamata');
+        if (culinaryRows && culinaryRows.length > 0) {
+          const existingCulinary = storage.getCulinarySouvenirs();
+          const mergedCulinary = [...existingCulinary];
+
+          culinaryRows.forEach((row, idx) => {
+            const itemId = this.getRowValue(row, ['ID', 'id', 'col_0']) || `prod-sheet-${idx}`;
+            const name = this.getRowValue(row, ['Nama Produk', 'name', 'col_1']) || `Produk Saka ${idx + 1}`;
+            const kind = (this.getRowValue(row, ['Jenis', 'kind', 'col_2']) || 'KULINER').toUpperCase() === 'CINDERAMATA' ? 'CINDERAMATA' : 'KULINER';
+            const krida = (this.getRowValue(row, ['Kategori', 'krida', 'col_3']) || 'Krida Kuliner & Cinderamata') as any;
+            const price = parseFloat(this.getRowValue(row, ['Harga', 'price', 'col_4'])) || 50000;
+            const author = this.getRowValue(row, ['Produsen/Pengrajin', 'author', 'col_5']) || 'Kader Saka Pariwisata';
+            const phone = this.normalizePhoneNumber(this.getRowValue(row, ['Kontak WA', 'phone', 'col_6']));
+            const prov = this.getRowValue(row, ['Provinsi', 'province', 'col_7']) || 'Jawa Barat';
+            const reg = this.getRowValue(row, ['Kabupaten/Kota', 'regency', 'col_8']) || 'Kabupaten Bandung';
+            const img = this.cleanDriveImageUrl(this.getRowValue(row, ['Foto Produk', 'image', 'col_9'])) || 'https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?w=800&auto=format&fit=crop&q=80';
+            const catLabel = this.getRowValue(row, ['Sertifikasi Halal', 'category', 'col_10']) || 'Produk UMKM Saka Pariwisata';
+
+            const culObj: CulinarySouvenirItem = {
+              id: itemId,
+              name,
+              kind,
+              krida,
+              kridaCategory: kind === 'KULINER' ? 'Kuliner & Minuman Daerah' : 'Kriya & Cinderamata Khas',
+              categoryLabel: catLabel,
+              description: `Produk karya kader Saka Pariwisata: ${name}. Terjamin mutu dan higienis.`,
+              priceEstimate: price,
+              priceUnit: 'per kemasan / pcs',
+              imageUrl: img,
+              provinceId: '32',
+              provinceName: prov,
+              regencyId: '32.04',
+              regencyName: reg,
+              districtId: '32.04.01',
+              districtName: 'Sentra Saka',
+              authorMemberId: 'mem-jabar-01',
+              authorName: author,
+              authorNta: '32.73.01.000124',
+              contactPhone: phone,
+              tags: ['UMKM', 'Saka Pariwisata', 'Lokal'],
+              status: 'APPROVED',
+              createdAt: new Date().toISOString(),
+              likesCount: 25,
+              featured: true
+            };
+
+            const existingIdx = mergedCulinary.findIndex(c => c.id === itemId || c.name.toLowerCase() === name.toLowerCase());
+            if (existingIdx !== -1) {
+              mergedCulinary[existingIdx] = { ...mergedCulinary[existingIdx], ...culObj };
+            } else {
+              mergedCulinary.push(culObj);
+            }
+          });
+
+          storage.setCulinarySouvenirs(mergedCulinary);
+        }
+      } catch (e) {
+        console.warn('Culinary sync notice:', e);
+      }
+
+      // Bersihkan duplikat database
+      storage.deduplicateDatabase();
+
+      const successMsg = `Berhasil menyinkronkan database spreadsheet. ${memberCount} data anggota terbaca (${addedMemberCount} data baru ditambahkan).`;
       this.saveConfig({
         lastSyncedAt: new Date().toISOString(),
         status: 'CONNECTED',
@@ -350,11 +600,7 @@ class SpreadsheetService {
       });
 
       this.isSyncing = false;
-      return { 
-        success: true, 
-        count: 0, 
-        message: 'Spreadsheet terhubung. Tidak ada baris baru yang perlu ditambahkan.' 
-      };
+      return { success: true, count: memberCount, message: successMsg };
     } catch (err: any) {
       this.isSyncing = false;
       console.error('Sync failed:', err);

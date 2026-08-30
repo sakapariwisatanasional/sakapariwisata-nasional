@@ -1,6 +1,7 @@
 import { Member, UserRole } from '../types';
 import { storage } from './storage';
 import { spreadsheetService } from './spreadsheetService';
+import { formatDriveImageUrl } from '../components/common/SakaLogo';
 
 export interface VerificationResult {
   found: boolean;
@@ -172,14 +173,45 @@ export async function searchMemberInRemoteSpreadsheet(rawInput: string): Promise
       return 'MEMBER';
     };
 
+    const getVal = (row: Record<string, any>, aliases: string[]): string => {
+      for (const a of aliases) {
+        if (row[a] !== undefined && row[a] !== null && String(row[a]).trim() !== '') {
+          return String(row[a]).trim();
+        }
+      }
+      const keys = Object.keys(row);
+      for (const a of aliases) {
+        const cleanA = a.toLowerCase().replace(/[^a-z0-9]/g, '');
+        for (const k of keys) {
+          const cleanK = k.toLowerCase().replace(/[^a-z0-9]/g, '');
+          if (cleanK === cleanA) {
+            const v = row[k];
+            if (v !== undefined && v !== null && String(v).trim() !== '') {
+              return String(v).trim();
+            }
+          }
+        }
+      }
+      return '';
+    };
+
     // Cari baris yang cocok
     for (let idx = 0; idx < rows.length; idx++) {
       const row = rows[idx];
-      const fullName = row['Nama Lengkap'] || row['nama_lengkap'] || row['Nama'] || row['col_1'] || `Anggota ${idx + 1}`;
-      const kta = row['Nomor Anggota'] || row['Nomor KTA'] || row['nomor_kta'] || row['col_0'] || '';
-      const email = row['Email'] || row['email'] || `member${idx + 1}@pramuka.id`;
-      const phone = row['Nomor WA'] || row['No WhatsApp'] || row['Telepon'] || row['col_4'] || '';
-      const memberId = row['ID'] || row['id'] || `sheet-member-${idx}`;
+      const fullName = getVal(row, ['Nama Lengkap', 'nama_lengkap', 'Nama', 'nama', 'Full Name', 'Name', 'col_1']) || `Anggota ${idx + 1}`;
+      const kta = getVal(row, ['Nomor KTA', 'Nomor Anggota', 'nomor_kta', 'NTA', 'KTA', 'No KTA', 'No. KTA', 'col_2', 'col_0']);
+      const email = getVal(row, ['Email', 'email', 'E-mail', 'col_10']) || `member${idx + 1}@pramuka.id`;
+      const phone = getVal(row, ['Nomor WA', 'No WhatsApp', 'Nomor WhatsApp', 'No WA', 'WhatsApp', 'Telepon', 'col_9', 'col_4']);
+      const memberId = getVal(row, ['ID', 'id', 'Id', 'member_id', 'col_0']) || `sheet-member-${idx}`;
+      const prov = getVal(row, ['Provinsi', 'Kwarda', 'provinsi', 'col_3']) || 'Tingkat Nasional';
+      const kab = getVal(row, ['Kabupaten/Kota', 'Kwarcab', 'kabupaten', 'col_4']) || 'Kwartir Nasional';
+      const kec = getVal(row, ['Kwarran/Kecamatan', 'Kwartir Ranting', 'Kwarran', 'kecamatan_ranting', 'col_5']) || 'Pimpinan Nasional';
+      const gudep = getVal(row, ['Gugus Depan', 'Gudep', 'gudep', 'col_6']) || 'Gudep Saka Pariwisata';
+      const krida = getVal(row, ['Krida', 'krida', 'col_7']) || 'Krida Pemandu';
+      const roleStr = getVal(row, ['Role', 'Peran', 'Jabatan', 'Posisi']);
+      const role = parseRole(roleStr);
+      const rawFoto = getVal(row, ['Foto URL', 'foto_url', 'Foto', 'Pas Foto', 'Photo', 'Avatar', 'col_11']);
+      const avatarUrl = formatDriveImageUrl(rawFoto) || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&fit=crop&q=80';
 
       const tempMember: Member = {
         id: memberId,
@@ -187,32 +219,33 @@ export async function searchMemberInRemoteSpreadsheet(rawInput: string): Promise
         nationalMemberNumber: kta || undefined,
         fullName,
         nikMasked: '3201**********01',
-        avatarUrl: row['Foto URL'] || row['foto_url'] || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&fit=crop&q=80',
+        avatarUrl,
         gender: 'LAKI_LAKI',
         birthPlace: 'Indonesia',
         birthDate: '2000-01-01',
         email,
         phone,
-        address: `${row['Kwartir Ranting'] || 'Kwarran'}, ${row['Kabupaten/Kota'] || 'Kwarcab'}, ${row['Provinsi'] || 'Kwarda'}`,
+        address: `${kec}, ${kab}, ${prov}`,
         provinceId: '00',
-        provinceName: row['Provinsi'] || row['Kwarda'] || 'Tingkat Daerah',
+        provinceName: prov,
         regencyId: '00.00',
-        regencyName: row['Kabupaten/Kota'] || row['Kwarcab'] || 'Kwartir Cabang',
+        regencyName: kab,
         districtId: '00.00.00',
-        districtName: row['Kwartir Ranting'] || row['Kwarran'] || 'Kwartir Ranting',
+        districtName: kec,
         branchId: `branch-${idx}`,
-        branchName: row['Kwartir Ranting'] || row['Kwarran'] || 'Kwartir Ranting',
-        gugusDepan: row['Gugus Depan'] || row['Gudep'] || 'Gudep Terdaftar',
-        currentPosition: row['Jabatan'] || 'Anggota Saka Pariwisata',
-        krida: (row['Krida'] || 'Krida Pemandu') as any,
+        branchName: kec,
+        gugusDepan: gudep,
+        currentPosition: role === 'SUPER_ADMIN' ? 'Ketua Pimpinan Saka Pariwisata Nasional' : `Anggota ${krida}`,
+        krida: (krida || 'Krida Pemandu') as any,
         joinYear: new Date().getFullYear(),
         educationLevel: 'SMA/SMK',
         occupation: 'Pramuka Pariwisata',
         bio: `Anggota resmi Saka Pariwisata. Terverifikasi dari database Google Spreadsheet.`,
-        status: (row['Status'] || 'ACTIVE').toUpperCase() === 'PENDING' ? 'PENDING' : 'ACTIVE',
-        registeredAt: new Date().toISOString(),
-        verificationToken: `VERIFY-SP-${memberId}`,
-        isOperator: false,
+        status: (getVal(row, ['Status', 'status', 'col_8']) || 'ACTIVE').toUpperCase() === 'PENDING' ? 'PENDING' : 'ACTIVE',
+        registeredAt: getVal(row, ['Tanggal Daftar', 'tanggal_daftar', 'Created At', 'Timestamp', 'col_13']) || new Date().toISOString(),
+        verificationToken: `VERIFY-SP-${kta ? kta.replace(/\./g, '') : memberId}`,
+        isOperator: role !== 'MEMBER',
+        operatorRole: role !== 'MEMBER' ? role : undefined,
         skills: [],
         certifications: [],
         locationHistory: []

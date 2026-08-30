@@ -30,6 +30,7 @@ import {
 } from 'lucide-react';
 import { Member, CurrentUser, Province, Regency } from '../types';
 import { DigitalMemberCard } from '../components/member/DigitalMemberCard';
+import { formatDriveImageUrl, getDriveDirectFallbackUrl, getValidAvatarUrl } from '../components/common/SakaLogo';
 
 interface MemberManagementViewProps {
   currentUser: CurrentUser;
@@ -315,9 +316,19 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
                       <div className="flex items-center gap-3">
                         <div className="relative group/avatar flex-shrink-0">
                           <img
-                            src={m.avatarUrl}
+                            src={formatDriveImageUrl(m.avatarUrl) || m.avatarUrl || getValidAvatarUrl(m.avatarUrl, m.gender)}
                             alt={m.fullName}
-                            className="w-10 h-10 rounded-xl object-cover border border-slate-200 shadow-xs"
+                            referrerPolicy="no-referrer"
+                            className="w-10 h-10 rounded-xl object-cover border border-slate-200 shadow-xs bg-slate-800"
+                            onError={(e) => {
+                              const img = e.target as HTMLImageElement;
+                              const directFallback = getDriveDirectFallbackUrl(m.avatarUrl);
+                              if (directFallback && img.src !== directFallback) {
+                                img.src = directFallback;
+                              } else {
+                                img.src = getValidAvatarUrl('', m.gender);
+                              }
+                            }}
                           />
                           {onOpenEditPhotoModal && (
                             <button
@@ -583,9 +594,19 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
             <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-2 text-xs">
               <div className="flex items-center gap-3">
                 <img
-                  src={memberToDelete.avatarUrl}
+                  src={formatDriveImageUrl(memberToDelete.avatarUrl) || memberToDelete.avatarUrl || getValidAvatarUrl(memberToDelete.avatarUrl, memberToDelete.gender)}
                   alt={memberToDelete.fullName}
-                  className="w-12 h-12 rounded-xl object-cover border border-slate-300"
+                  referrerPolicy="no-referrer"
+                  className="w-12 h-12 rounded-xl object-cover border border-slate-300 bg-slate-800"
+                  onError={(e) => {
+                    const img = e.target as HTMLImageElement;
+                    const directFallback = getDriveDirectFallbackUrl(memberToDelete.avatarUrl);
+                    if (directFallback && img.src !== directFallback) {
+                      img.src = directFallback;
+                    } else {
+                      img.src = getValidAvatarUrl('', memberToDelete.gender);
+                    }
+                  }}
                 />
                 <div>
                   <p className="font-bold text-slate-900 text-sm">{memberToDelete.fullName}</p>

@@ -77,54 +77,29 @@ export const INITIAL_ACTIVITIES: Activity[] = SHOWCASE_ACTIVITIES;
 // Database Riwayat Audit Log (Kosong)
 export const INITIAL_AUDIT_LOGS: AuditLog[] = [];
 
-// Akun Pengguna Multi-Role (Super Admin, Operator Provinsi, Operator Kab/Kota, Operator Ranting, Anggota, Publik)
+// Akun Pengguna Multi-Role (Super Admin Nasional, Anggota Terdaftar, dan Pengunjung Publik)
 export const DEMO_USERS: CurrentUser[] = [
   {
     id: 'user-superadmin-rohadi',
     username: 'rohadiwijaya',
     password: 'rohadiwijaya',
-    email: 'rohadiwijaya@sakapariwisata.id',
+    email: 'scoutpreneur@gmail.com',
     name: 'Rohadi Wijaya',
     role: 'SUPER_ADMIN',
-    jurisdictionName: 'Kwartir Nasional (Semua Wilayah)',
-    memberId: 'mem-nasional-01',
-    avatarUrl: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80'
+    jurisdictionName: 'Kwartir Nasional (Pusat)',
+    memberId: 'member-1788087636201',
+    avatarUrl: 'https://lh3.googleusercontent.com/d/1Ml-oopzoEgnZ75ZoNuA79KytVhYf3qOV'
   },
   {
-    id: 'user-kwarda-jabar',
-    username: 'kwardajabar',
-    password: 'kwardajabar',
-    email: 'kwarda.jabar@sakapariwisata.id',
-    name: 'Kak Hendra (Kwarda Jawa Barat)',
-    role: 'ADMIN_PROVINCE',
-    jurisdictionName: 'Kwarda Jawa Barat',
-    jurisdictionId: '32',
+    id: 'user-mem-rizky',
+    username: 'rizkymaulana',
+    password: 'rizkymaulana',
+    email: 'rizky.maulana@sakapariwisata.id',
+    name: 'Rizky Maulana, S.Par',
+    role: 'MEMBER',
+    jurisdictionName: 'Anggota Krida Pemandu (Kota Bandung)',
     memberId: 'mem-jabar-01',
     avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80'
-  },
-  {
-    id: 'user-kwarcab-bandung',
-    username: 'kwarcabbandung',
-    password: 'kwarcabbandung',
-    email: 'kwarcab.bandung@sakapariwisata.id',
-    name: 'Kak Asep (Kwarcab Kab. Bandung)',
-    role: 'ADMIN_REGENCY',
-    jurisdictionName: 'Kwarcab Kabupaten Bandung',
-    jurisdictionId: '32.04',
-    memberId: 'mem-jabar-02',
-    avatarUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80'
-  },
-  {
-    id: 'user-kwarran-ciwidey',
-    username: 'kwarranciwidey',
-    password: 'kwarranciwidey',
-    email: 'kwarran.ciwidey@sakapariwisata.id',
-    name: 'Kak Deden (Kwarran Ciwidey)',
-    role: 'ADMIN_BRANCH',
-    jurisdictionName: 'Kwarran Ciwidey',
-    jurisdictionId: 'br-ciwidey-01',
-    memberId: 'mem-jabar-03',
-    avatarUrl: 'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=150&auto=format&fit=crop&q=80'
   },
   {
     id: 'user-mem-siti',
