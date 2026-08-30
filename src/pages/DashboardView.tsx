@@ -432,14 +432,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           )}
 
           <button
-            onClick={onOpenRegisterModal}
-            className="flex-1 md:flex-none px-4 sm:px-5 py-2.5 sm:py-3 bg-gradient-to-r from-purple-600 to-indigo-500 hover:from-purple-500 hover:to-indigo-400 text-white font-bold rounded-xl sm:rounded-2xl text-xs flex items-center justify-center gap-2 shadow-lg shadow-purple-950/40 transition-all active:scale-95 cursor-pointer min-h-[44px]"
-          >
-            <UserPlus className="w-4 h-4" />
-            <span>Daftar Anggota Baru</span>
-          </button>
-
-          <button
             onClick={() => onSelectTab('verify-portal')}
             className="flex-1 md:flex-none px-4 sm:px-5 py-2.5 sm:py-3 bg-white/10 hover:bg-white/20 text-white font-semibold rounded-xl sm:rounded-2xl text-xs flex items-center justify-center gap-2 backdrop-blur-xs border border-white/20 transition-all cursor-pointer min-h-[44px]"
           >

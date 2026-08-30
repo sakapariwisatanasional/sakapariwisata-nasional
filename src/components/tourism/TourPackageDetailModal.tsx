@@ -16,6 +16,7 @@ import {
   Sparkles
 } from 'lucide-react';
 import { TourPackage } from '../../types';
+import { formatDriveImageUrl } from '../common/SakaLogo';
 
 interface TourPackageDetailModalProps {
   tour: TourPackage | null;
@@ -32,15 +33,22 @@ export const TourPackageDetailModal: React.FC<TourPackageDetailModalProps> = ({
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(val);
   };
 
+  const coverImg = formatDriveImageUrl(tour.coverImage || (tour as any).coverImageUrl) || 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=1200&auto=format&fit=crop&q=80';
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-in fade-in duration-150">
       <div className="bg-white w-full max-w-3xl rounded-3xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[92vh]">
         {/* Cover & Header */}
         <div className="relative h-64 bg-slate-900 flex-shrink-0">
           <img
-            src={tour.coverImage}
+            src={coverImg}
             alt={tour.title}
-            className="w-full h-full object-cover opacity-80"
+            loading="lazy"
+            referrerPolicy="no-referrer"
+            onError={(e) => {
+              (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=1200&auto=format&fit=crop&q=80';
+            }}
+            className="w-full h-full object-cover"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent" />
 

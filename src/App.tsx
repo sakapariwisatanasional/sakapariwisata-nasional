@@ -41,6 +41,7 @@ import { KtaCardCustomizerModal } from './components/member/KtaCardCustomizerMod
 import { MemberPhotoEditModal } from './components/member/MemberPhotoEditModal';
 import { AdminEditMemberModal } from './components/member/AdminEditMemberModal';
 import { KtaPrintPdfModal } from './components/member/KtaPrintPdfModal';
+import { QuickShareBadgeModal } from './components/member/QuickShareBadgeModal';
 import { OperatorRoleModal } from './components/member/OperatorRoleModal';
 import { CulinarySouvenirFormModal } from './components/culinary/CulinarySouvenirFormModal';
 import { CulinarySouvenirDetailModal } from './components/culinary/CulinarySouvenirDetailModal';
@@ -80,6 +81,7 @@ export default function App() {
   const [editingPhotoMember, setEditingPhotoMember] = useState<Member | null>(null);
   const [editingMember, setEditingMember] = useState<Member | null>(null);
   const [printingKtaMember, setPrintingKtaMember] = useState<Member | null>(null);
+  const [quickSharingMember, setQuickSharingMember] = useState<Member | null>(null);
   const [managingOperatorMember, setManagingOperatorMember] = useState<Member | null>(null);
   const [verifyingMember, setVerifyingMember] = useState<Member | null>(null);
   const [transferringMember, setTransferringMember] = useState<Member | null>(null);
@@ -334,6 +336,7 @@ export default function App() {
                 onOpenEditPhotoModal={(m) => setEditingPhotoMember(m)}
                 onOpenEditMemberModal={(m) => setEditingMember(m)}
                 onOpenPrintPdfModal={(m) => setPrintingKtaMember(m)}
+                onOpenQuickShareModal={(m) => setQuickSharingMember(m)}
                 onOpenOperatorModal={(m) => setManagingOperatorMember(m)}
                 onDeleteMember={handleDeleteMember}
                 onDeleteAllDummyMembers={handleDeleteAllDummyMembers}
@@ -399,6 +402,7 @@ export default function App() {
                 onOpenEditPhotoModal={(m) => setEditingPhotoMember(m)}
                 onOpenEditMemberModal={(m) => setEditingMember(m)}
                 onOpenPrintPdfModal={(m) => setPrintingKtaMember(m)}
+                onOpenQuickShareModal={(m) => setQuickSharingMember(m)}
               />
             )}
           </div>
@@ -505,7 +509,18 @@ export default function App() {
         }}
       />
 
-      {/* 12. Operator Role Management Modal (Super Admin Only) */}
+      {/* 12. Quick Share & Event Networking Badge Modal */}
+      <QuickShareBadgeModal
+        isOpen={!!quickSharingMember}
+        member={quickSharingMember}
+        onClose={() => setQuickSharingMember(null)}
+        onOpenVerifyModal={(m) => {
+          setQuickSharingMember(null);
+          setVerifyingMember(m);
+        }}
+      />
+
+      {/* 13. Operator Role Management Modal (Super Admin Only) */}
       <OperatorRoleModal
         isOpen={!!managingOperatorMember}
         member={managingOperatorMember}

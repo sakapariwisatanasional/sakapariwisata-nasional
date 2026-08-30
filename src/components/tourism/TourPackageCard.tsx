@@ -11,6 +11,7 @@ import {
   AlertTriangle 
 } from 'lucide-react';
 import { TourPackage } from '../../types';
+import { formatDriveImageUrl } from '../common/SakaLogo';
 
 interface TourPackageCardProps {
   tour: TourPackage;
@@ -45,10 +46,15 @@ export const TourPackageCard: React.FC<TourPackageCardProps> = ({
   return (
     <div className="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all flex flex-col overflow-hidden group">
       {/* Cover Image & Category */}
-      <div className="relative h-48 overflow-hidden bg-slate-100">
+      <div className="relative h-48 overflow-hidden bg-slate-900">
         <img
-          src={tour.coverImage}
+          src={formatDriveImageUrl(tour.coverImage || (tour as any).coverImageUrl) || 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=800&auto=format&fit=crop&q=80'}
           alt={tour.title}
+          loading="lazy"
+          referrerPolicy="no-referrer"
+          onError={(e) => {
+            (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=800&auto=format&fit=crop&q=80';
+          }}
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/20" />

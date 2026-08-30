@@ -1,6 +1,6 @@
 {
   "name": "Saka Pariwisata Indonesia",
-  "description": "Platform Digital Saka Pariwisata Indonesia: Keanggotaan Nasional, Manajemen Operator Kwartir, Kartu Anggota Digital, Direktori Keahlian, Paket Wisata Komunitas, serta Galeri Kuliner dan Cinderamata Khas Daerah.",
+  "description": "Satu Keanggotaan, Satu Ekosistem Pariwisata Indonesia: Platform keanggotaan nasional Saka Pariwisata yang menghubungkan Pramuka Saka Pariwisata dari seluruh Indonesia melalui KTA Digital berbasis QR Code, direktori keahlian, paket wisata komunitas, serta katalog kuliner dan cinderamata.",
   "requestFramePermissions": [],
   "majorCapabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"

@@ -21,6 +21,7 @@ import {
   Camera,
   FileDown,
   Edit3,
+  Share2,
   Shield,
   ShieldCheck,
   ShieldAlert,
@@ -43,6 +44,7 @@ interface MemberManagementViewProps {
   onOpenEditPhotoModal?: (member: Member) => void;
   onOpenEditMemberModal?: (member: Member) => void;
   onOpenPrintPdfModal?: (member: Member) => void;
+  onOpenQuickShareModal?: (member: Member) => void;
   onOpenOperatorModal?: (member: Member) => void;
   onDeleteMember?: (member: Member) => void;
   onDeleteAllDummyMembers?: () => void;
@@ -61,6 +63,7 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
   onOpenEditPhotoModal,
   onOpenEditMemberModal,
   onOpenPrintPdfModal,
+  onOpenQuickShareModal,
   onOpenOperatorModal,
   onDeleteMember,
   onDeleteAllDummyMembers
@@ -407,6 +410,17 @@ export const MemberManagementView: React.FC<MemberManagementViewProps> = ({
                             title="Cetak / Konversi KTA ke PDF (CR80 / A4)"
                           >
                             <FileDown className="w-4 h-4 text-purple-700" />
+                          </button>
+                        )}
+
+                        {/* Quick Share / Badge Networking Event */}
+                        {onOpenQuickShareModal && (
+                          <button
+                            onClick={() => onOpenQuickShareModal(m)}
+                            className="p-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 rounded-lg transition-colors border border-amber-300/80 cursor-pointer"
+                            title="Quick Share: Badge Event & QR Portofolio Instan"
+                          >
+                            <Share2 className="w-4 h-4 text-amber-700" />
                           </button>
                         )}
 

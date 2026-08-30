@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
   ShieldCheck, 
   Search, 
@@ -22,10 +22,16 @@ import {
   Star,
   Layers,
   Heart,
-  Globe2
+  Globe2,
+  Clock,
+  Gift,
+  TreePine,
+  ShoppingBag,
+  BadgeCheck,
+  Check
 } from 'lucide-react';
 import { Member, TourPackage, CulinarySouvenirItem, CurrentUser } from '../types';
-import { SakaLogo } from '../components/common/SakaLogo';
+import { SakaLogo, formatDriveImageUrl } from '../components/common/SakaLogo';
 import { DEFAULT_SPREADSHEET_URL } from '../services/spreadsheetService';
 import { GOOGLE_DRIVE_MAIN_FOLDER } from '../services/driveRepository';
 
@@ -61,8 +67,17 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
   const [quickVerifyTerm, setQuickVerifyTerm] = useState('');
   const [verifyError, setVerifyError] = useState('');
 
+  const [galleryTab, setGalleryTab] = useState<'ALL' | 'TOURS' | 'CULINARY' | 'SOUVENIR'>('ALL');
   const activeMembersCount = members.filter(m => m.status === 'ACTIVE').length;
   const publishedTours = tours.filter(t => t.status === 'APPROVED_PUBLISHED');
+  const approvedProducts = culinaryItems.filter(c => (c.status || 'APPROVED') === 'APPROVED');
+  const culinaryProducts = approvedProducts.filter(c => c.kind === 'KULINER');
+  const souvenirProducts = approvedProducts.filter(c => c.kind === 'CINDERAMATA');
+
+  // Fallback high-res tourism images
+  const DEFAULT_TOUR_IMG = 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=1200&auto=format&fit=crop&q=80';
+  const DEFAULT_FOOD_IMG = 'https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?w=800&auto=format&fit=crop&q=80';
+  const DEFAULT_CRAFT_IMG = 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&auto=format&fit=crop&q=80';
 
   const handleQuickVerify = (e: React.FormEvent) => {
     e.preventDefault();
@@ -202,42 +217,20 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
           </div>
 
           {/* Main Headline */}
-          <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold font-heading text-white tracking-tight leading-tight sm:leading-none">
-            Keanggotaan Nasional & <br className="hidden sm:inline" />
+          <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold font-heading text-white tracking-tight leading-tight">
+            Satu Keanggotaan, <br className="hidden sm:inline" />
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-amber-300 to-teal-300">
-              Pemberdayaan Pariwisata Indonesia
+              Satu Ekosistem Pariwisata Indonesia
             </span>
           </h1>
 
           <p className="text-sm sm:text-base text-slate-300 max-w-2xl mx-auto leading-relaxed">
-            Menghubungkan Pramuka Penegak & Pandega di seluruh Kwartir Daerah, Cabang, dan Ranting dengan KTA Digital Berbasis QR Code, Direktori Keahlian, Paket Wisata Komunitas, serta Katalog Kuliner & Cinderamata Khas Daerah.
+            Platform keanggotaan nasional Saka Pariwisata yang menghubungkan Pramuka Saka Pariwisata dari seluruh Indonesia melalui KTA Digital berbasis QR Code, direktori keahlian, paket wisata komunitas, serta katalog kuliner dan cinderamata.
           </p>
 
-          {/* Quick CTA Buttons */}
-          <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
-            <button
-              onClick={onOpenRegisterModal}
-              className="px-6 py-3.5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-extrabold text-sm rounded-2xl shadow-lg shadow-emerald-950/50 transition-all active:scale-95 flex items-center gap-2 cursor-pointer"
-            >
-              <UserPlus className="w-4 h-4 text-slate-950" />
-              <span>Daftar Anggota Saka Baru</span>
-            </button>
-
-            <button
-              onClick={() => onEnterDashboard('verify-portal')}
-              className="px-6 py-3.5 bg-slate-800 hover:bg-slate-700 text-white font-bold text-sm rounded-2xl border border-slate-700 shadow-md transition-all flex items-center gap-2 cursor-pointer"
-            >
-              <Compass className="w-4 h-4 text-purple-400" />
-              <span>Jelajah Paket Wisata & Karya</span>
-            </button>
-
-            <button
-              onClick={onOpenLoginModal}
-              className="px-6 py-3.5 bg-purple-900/60 hover:bg-purple-900 text-purple-200 font-bold text-sm rounded-2xl border border-purple-700/60 shadow-md transition-all flex items-center gap-2 cursor-pointer"
-            >
-              <Lock className="w-4 h-4 text-purple-300" />
-              <span>Masuk Akun Pengurus / Operator</span>
-            </button>
+          {/* Slogan / Tagline */}
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-purple-950/70 border border-purple-800/80 text-amber-300 text-xs sm:text-sm font-bold tracking-wide shadow-md">
+            <span>Terhubung • Berkarya • Berdaya • Mempromosikan Pariwisata Indonesia</span>
           </div>
 
           {/* 3. QUICK VERIFICATION BOX */}
@@ -350,125 +343,332 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
 
       {/* 6. PAKET WISATA & KULINER SPOTLIGHT */}
       <section className="py-16 px-4 sm:px-8 max-w-7xl mx-auto space-y-8 border-t border-slate-800">
-        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
-          <div>
-            <span className="text-xs font-bold text-purple-400 uppercase tracking-widest">
-              Wisata & Karya Komunitas
-            </span>
-            <h2 className="text-2xl sm:text-3xl font-extrabold text-white font-heading mt-1">
+        {/* Header & Controls */}
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+          <div className="space-y-1.5">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-950/80 border border-purple-800/60 text-purple-300 text-[11px] font-bold uppercase tracking-wider">
+              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+              <span>Wisata & Karya 4 Krida Nusantara</span>
+            </div>
+            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-white font-heading">
               Jelajahi Paket Wisata & Cinderamata Khas
             </h2>
+            <p className="text-xs sm:text-sm text-slate-400 max-w-2xl leading-relaxed">
+              Karya nyata kader Saka Pariwisata se-Indonesia: paket ekowisata terpandu, gastronomi khas daerah, serta suvenir ramah lingkungan siap dipesan.
+            </p>
           </div>
 
+          {/* Action Links */}
+          <div className="flex items-center gap-3 flex-wrap">
+            <button
+              onClick={() => onEnterDashboard('tours')}
+              className="inline-flex items-center gap-1.5 px-4 py-2 bg-purple-900/60 hover:bg-purple-900 text-purple-200 border border-purple-700/60 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs"
+            >
+              <span>Direktori Wisata</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={() => onEnterDashboard('culinary-souvenirs')}
+              className="inline-flex items-center gap-1.5 px-4 py-2 bg-amber-950/60 hover:bg-amber-900/80 text-amber-300 border border-amber-700/60 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs"
+            >
+              <span>Galeri 4 Krida</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+
+        {/* Interactive Filter Pills */}
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 custom-scrollbar -mx-2 px-2 sm:mx-0 sm:px-0">
           <button
-            onClick={() => onEnterDashboard('tours')}
-            className="inline-flex items-center gap-1.5 text-xs font-bold text-purple-400 hover:text-purple-300 cursor-pointer"
+            onClick={() => setGalleryTab('ALL')}
+            className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer flex items-center gap-2 ${
+              galleryTab === 'ALL'
+                ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md shadow-purple-950/50'
+                : 'bg-slate-950/80 hover:bg-slate-900 text-slate-400 border border-slate-800'
+            }`}
           >
-            <span>Lihat Semua Direktori</span>
-            <ArrowRight className="w-4 h-4" />
+            <span>Semua Rekomendasi</span>
+            <span className="px-1.5 py-0.2 bg-white/20 text-white rounded-md text-[10px] font-mono">
+              {publishedTours.length + approvedProducts.length}
+            </span>
+          </button>
+
+          <button
+            onClick={() => setGalleryTab('TOURS')}
+            className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer flex items-center gap-2 ${
+              galleryTab === 'TOURS'
+                ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md shadow-purple-950/50'
+                : 'bg-slate-950/80 hover:bg-slate-900 text-slate-400 border border-slate-800'
+            }`}
+          >
+            <TreePine className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Paket Wisata & Ekowisata</span>
+            <span className="px-1.5 py-0.2 bg-white/20 text-white rounded-md text-[10px] font-mono">
+              {publishedTours.length}
+            </span>
+          </button>
+
+          <button
+            onClick={() => setGalleryTab('CULINARY')}
+            className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer flex items-center gap-2 ${
+              galleryTab === 'CULINARY'
+                ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md shadow-purple-950/50'
+                : 'bg-slate-950/80 hover:bg-slate-900 text-slate-400 border border-slate-800'
+            }`}
+          >
+            <Utensils className="w-3.5 h-3.5 text-amber-400" />
+            <span>Kuliner Khas Daerah</span>
+            <span className="px-1.5 py-0.2 bg-white/20 text-white rounded-md text-[10px] font-mono">
+              {culinaryProducts.length}
+            </span>
+          </button>
+
+          <button
+            onClick={() => setGalleryTab('SOUVENIR')}
+            className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer flex items-center gap-2 ${
+              galleryTab === 'SOUVENIR'
+                ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md shadow-purple-950/50'
+                : 'bg-slate-950/80 hover:bg-slate-900 text-slate-400 border border-slate-800'
+            }`}
+          >
+            <Gift className="w-3.5 h-3.5 text-rose-400" />
+            <span>Kriya & Cinderamata</span>
+            <span className="px-1.5 py-0.2 bg-white/20 text-white rounded-md text-[10px] font-mono">
+              {souvenirProducts.length}
+            </span>
           </button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {publishedTours.slice(0, 3).map((tour) => (
-            <div
-              key={tour.id}
-              onClick={() => onViewTourDetail(tour)}
-              className="bg-slate-950 border border-slate-800 rounded-3xl overflow-hidden hover:border-purple-500/60 transition-all cursor-pointer group shadow-xl"
-            >
-              <div className="relative h-48 overflow-hidden">
-                <img
-                  src={tour.coverImageUrl}
-                  alt={tour.title}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                />
-                <span className="absolute top-3 left-3 px-2.5 py-1 bg-slate-950/85 backdrop-blur-xs text-purple-300 text-[10px] font-bold rounded-lg border border-purple-500/30">
-                  {tour.category}
-                </span>
-                <span className="absolute bottom-3 right-3 px-2.5 py-1 bg-emerald-950/90 text-emerald-300 text-xs font-extrabold rounded-lg border border-emerald-500/30">
-                  Rp {((tour as any).price ?? tour.pricePerPerson ?? 0).toLocaleString('id-ID')}
-                </span>
-              </div>
-
-              <div className="p-5 space-y-2">
-                <div className="flex items-center gap-1.5 text-[11px] text-slate-400">
-                  <MapPin className="w-3.5 h-3.5 text-rose-400" />
-                  <span>{tour.regencyName}, {tour.provinceName}</span>
-                </div>
-                <h4 className="font-bold text-white text-sm font-heading group-hover:text-purple-300 transition-colors line-clamp-1">
-                  {tour.title}
-                </h4>
-                <p className="text-xs text-slate-400 line-clamp-2 leading-relaxed">
-                  {tour.description}
-                </p>
-              </div>
+        {/* 1. TOURS GRID (When ALL or TOURS is active) */}
+        {(galleryTab === 'ALL' || galleryTab === 'TOURS') && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-base sm:text-lg font-extrabold text-white font-heading flex items-center gap-2">
+                <TreePine className="w-4 h-4 text-emerald-400" />
+                <span>Paket Wisata & Destinasi Binaan Pramuka</span>
+              </h3>
+              <button
+                onClick={() => onEnterDashboard('tours')}
+                className="text-xs font-bold text-emerald-400 hover:text-emerald-300 flex items-center gap-1 cursor-pointer"
+              >
+                <span>Lihat Semua ({publishedTours.length})</span>
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
             </div>
-          ))}
-        </div>
 
-        {/* 4 Krida Approved Products Showcase for Public Visitors */}
-        {culinaryItems.filter(c => (c.status || 'APPROVED') === 'APPROVED').length > 0 && (
-          <div className="pt-8 border-t border-slate-850 space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
-              <div>
-                <span className="text-xs font-bold text-amber-400 uppercase tracking-widest">
-                  Karya Anggota 4 Krida Terverifikasi
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {(galleryTab === 'ALL' ? publishedTours.slice(0, 3) : publishedTours).map((tour) => {
+                const tourImgUrl = formatDriveImageUrl(tour.coverImage || (tour as any).coverImageUrl) || DEFAULT_TOUR_IMG;
+                const price = (tour as any).price ?? tour.pricePerPerson ?? 0;
+
+                return (
+                  <div
+                    key={tour.id}
+                    onClick={() => onViewTourDetail(tour)}
+                    className="bg-slate-950/90 border border-slate-800 rounded-3xl overflow-hidden hover:border-emerald-500/60 transition-all duration-300 cursor-pointer group shadow-xl hover:shadow-emerald-950/30 flex flex-col justify-between hover:-translate-y-1.5"
+                  >
+                    <div>
+                      {/* Image Container with high-res rendering */}
+                      <div className="relative h-52 sm:h-56 overflow-hidden bg-slate-900">
+                        <img
+                          src={tourImgUrl}
+                          alt={tour.title}
+                          loading="lazy"
+                          referrerPolicy="no-referrer"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src = DEFAULT_TOUR_IMG;
+                          }}
+                          className="w-full h-full object-cover group-hover:scale-108 transition-transform duration-700 ease-out"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/30 to-black/30" />
+
+                        {/* Top Badges */}
+                        <div className="absolute top-3 left-3 right-3 flex items-center justify-between z-10">
+                          <span className="px-3 py-1 bg-slate-950/85 backdrop-blur-md text-emerald-300 text-xs font-extrabold rounded-xl border border-emerald-500/30 shadow-md flex items-center gap-1.5">
+                            <Compass className="w-3.5 h-3.5 text-emerald-400" />
+                            <span>{tour.category}</span>
+                          </span>
+
+                          {tour.featured && (
+                            <span className="px-2.5 py-1 bg-amber-500 text-slate-950 text-[10px] font-extrabold rounded-lg shadow-md flex items-center gap-1">
+                              <Star className="w-3 h-3 fill-slate-950" />
+                              <span>Unggulan</span>
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Bottom Overlay Info (Price & Duration) */}
+                        <div className="absolute bottom-3 left-3 right-3 flex items-end justify-between text-white z-10">
+                          <div className="bg-slate-950/80 backdrop-blur-md px-3 py-1.5 rounded-xl border border-white/10">
+                            <p className="text-[9px] text-slate-400 uppercase font-semibold">Mulai Dari</p>
+                            <p className="text-sm sm:text-base font-extrabold font-heading text-emerald-300 leading-tight">
+                              Rp {price.toLocaleString('id-ID')}
+                              <span className="text-[10px] font-normal text-slate-300"> / pax</span>
+                            </p>
+                          </div>
+
+                          <div className="flex items-center gap-1 text-xs bg-slate-950/80 backdrop-blur-md px-2.5 py-1.5 rounded-xl border border-white/10 font-semibold text-slate-200">
+                            <Clock className="w-3.5 h-3.5 text-amber-400" />
+                            <span>{tour.durationDays} Hari</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Card Body */}
+                      <div className="p-5 space-y-3">
+                        <div className="flex items-center gap-1.5 text-xs text-slate-400">
+                          <MapPin className="w-3.5 h-3.5 text-rose-400 flex-shrink-0" />
+                          <span className="truncate font-medium">{tour.regencyName}, {tour.provinceName}</span>
+                        </div>
+
+                        <h4 className="font-bold text-white text-base font-heading group-hover:text-emerald-300 transition-colors line-clamp-2 leading-snug">
+                          {tour.title}
+                        </h4>
+
+                        <p className="text-xs text-slate-400 line-clamp-2 leading-relaxed">
+                          {tour.description}
+                        </p>
+
+                        {/* Highlights pills */}
+                        {tour.facilities && tour.facilities.length > 0 && (
+                          <div className="flex flex-wrap gap-1.5 pt-1">
+                            {tour.facilities.slice(0, 2).map((fac, idx) => (
+                              <span
+                                key={idx}
+                                className="px-2 py-0.5 rounded-md bg-slate-900 border border-slate-800 text-[10px] text-slate-300 font-medium truncate max-w-[150px]"
+                              >
+                                ✓ {fac}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Card Footer */}
+                    <div className="px-5 pb-5 pt-2 border-t border-slate-850 flex items-center justify-between text-xs text-slate-400">
+                      <span className="truncate text-[11px]">
+                        {tour.guideProvided ? '✓ Pemandu Lisensi HPI/Saka' : 'Pemandu Lokal'}
+                      </span>
+                      <span className="text-emerald-400 font-bold text-xs group-hover:translate-x-1 transition-transform flex items-center gap-1">
+                        <span>Detail</span>
+                        <ArrowRight className="w-3.5 h-3.5" />
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* 2. CULINARY & SOUVENIR 4 KRIDA SHOWCASE (When ALL, CULINARY, or SOUVENIR is active) */}
+        {(galleryTab === 'ALL' || galleryTab === 'CULINARY' || galleryTab === 'SOUVENIR') && approvedProducts.length > 0 && (
+          <div className="space-y-4 pt-6 border-t border-slate-850">
+            <div className="flex items-center justify-between">
+              <h3 className="text-base sm:text-lg font-extrabold text-white font-heading flex items-center gap-2">
+                <Gift className="w-4 h-4 text-amber-400" />
+                <span>
+                  {galleryTab === 'CULINARY' 
+                    ? 'Katalog Kuliner & Minuman Khas Daerah' 
+                    : galleryTab === 'SOUVENIR'
+                    ? 'Katalog Kriya & Cinderamata Kreatif'
+                    : 'Karya Produk, Kriya & Kuliner Binaan 4 Krida'}
                 </span>
-                <h3 className="text-xl sm:text-2xl font-extrabold text-white font-heading mt-1">
-                  Produk, Kriya & Kuliner Khas Siap Pesan
-                </h3>
-              </div>
-
+              </h3>
               <button
                 onClick={() => onEnterDashboard('culinary-souvenirs')}
-                className="inline-flex items-center gap-1.5 text-xs font-bold text-amber-400 hover:text-amber-300 cursor-pointer"
+                className="text-xs font-bold text-amber-400 hover:text-amber-300 flex items-center gap-1 cursor-pointer"
               >
-                <span>Buka Galeri 4 Krida Lengkap</span>
-                <ArrowRight className="w-4 h-4" />
+                <span>Buka Semua ({approvedProducts.length})</span>
+                <ChevronRight className="w-3.5 h-3.5" />
               </button>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              {culinaryItems
-                .filter(c => (c.status || 'APPROVED') === 'APPROVED')
-                .slice(0, 4)
-                .map((item) => (
+              {(galleryTab === 'ALL'
+                ? approvedProducts.slice(0, 4)
+                : galleryTab === 'CULINARY'
+                ? culinaryProducts
+                : souvenirProducts
+              ).map((item) => {
+                const itemImgUrl = formatDriveImageUrl(item.imageUrl) || (item.kind === 'KULINER' ? DEFAULT_FOOD_IMG : DEFAULT_CRAFT_IMG);
+
+                return (
                   <div
                     key={item.id}
                     onClick={() => onSelectCulinaryDetail(item)}
-                    className="bg-slate-950 border border-slate-800 hover:border-amber-500/50 rounded-2xl overflow-hidden transition-all cursor-pointer group shadow-lg flex flex-col justify-between"
+                    className="bg-slate-950/90 border border-slate-800 hover:border-amber-500/60 rounded-3xl overflow-hidden transition-all duration-300 cursor-pointer group shadow-lg hover:shadow-amber-950/30 flex flex-col justify-between hover:-translate-y-1.5"
                   >
-                    <div className="relative h-40 overflow-hidden bg-slate-900">
-                      <img
-                        src={item.imageUrl}
-                        alt={item.name}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                      />
-                      <span className="absolute top-2.5 left-2.5 px-2 py-0.5 bg-amber-500/90 text-slate-950 text-[10px] font-extrabold rounded-md backdrop-blur-xs">
-                        {item.krida || (item.kind === 'KULINER' ? 'Kuliner' : 'Cinderamata')}
-                      </span>
-                      <span className="absolute bottom-2.5 right-2.5 px-2 py-0.5 bg-slate-950/85 text-emerald-400 text-[11px] font-mono font-bold rounded-md">
-                        Rp {(item.priceEstimate ?? 0).toLocaleString('id-ID')}
-                      </span>
-                    </div>
+                    <div>
+                      {/* Image container */}
+                      <div className="relative h-48 overflow-hidden bg-slate-900">
+                        <img
+                          src={itemImgUrl}
+                          alt={item.name}
+                          loading="lazy"
+                          referrerPolicy="no-referrer"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src = item.kind === 'KULINER' ? DEFAULT_FOOD_IMG : DEFAULT_CRAFT_IMG;
+                          }}
+                          className="w-full h-full object-cover group-hover:scale-108 transition-transform duration-700 ease-out"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/20 to-black/30" />
 
-                    <div className="p-4 space-y-1.5 flex-1 flex flex-col justify-between">
-                      <div>
-                        <p className="text-[10px] text-slate-400 font-medium truncate">
-                          {item.districtName} • {item.regencyName}
-                        </p>
-                        <h4 className="font-bold text-white text-xs sm:text-sm group-hover:text-amber-300 transition-colors line-clamp-1">
+                        {/* Top Badge */}
+                        <div className="absolute top-2.5 left-2.5 right-2.5 flex items-center justify-between z-10">
+                          <span className={`px-2.5 py-1 text-[10px] font-extrabold rounded-lg backdrop-blur-md shadow-md ${
+                            item.kind === 'KULINER'
+                              ? 'bg-amber-500/90 text-slate-950'
+                              : 'bg-rose-500/90 text-white'
+                          }`}>
+                            {item.krida || (item.kind === 'KULINER' ? 'Kuliner' : 'Cinderamata')}
+                          </span>
+
+                          <span className="px-2.5 py-1 bg-slate-950/85 backdrop-blur-md text-emerald-300 text-[11px] font-mono font-extrabold rounded-lg border border-emerald-500/30">
+                            Rp {(item.priceEstimate ?? 0).toLocaleString('id-ID')}
+                          </span>
+                        </div>
+
+                        {/* Bottom Tag */}
+                        <div className="absolute bottom-2.5 left-2.5 text-white z-10">
+                          <span className="text-[10px] text-slate-300 font-semibold px-2 py-0.5 rounded-md bg-slate-950/80 backdrop-blur-xs border border-white/10">
+                            {item.categoryLabel || item.kridaCategory || 'Karya Daerah'}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Card Info */}
+                      <div className="p-4 space-y-2">
+                        <div className="flex items-center gap-1.5 text-[11px] text-slate-400">
+                          <MapPin className="w-3 h-3 text-amber-400 flex-shrink-0" />
+                          <span className="truncate">{item.districtName} • {item.regencyName}</span>
+                        </div>
+
+                        <h4 className="font-bold text-white text-xs sm:text-sm group-hover:text-amber-300 transition-colors line-clamp-2 leading-snug">
                           {item.name}
                         </h4>
-                      </div>
 
-                      <div className="pt-2 border-t border-slate-850 flex items-center justify-between text-[11px] text-slate-400">
-                        <span className="truncate">Oleh {item.authorName}</span>
-                        <span className="text-amber-400 font-bold text-[10px]">Detail →</span>
+                        <p className="text-xs text-slate-400 line-clamp-2 leading-relaxed">
+                          {item.description}
+                        </p>
                       </div>
                     </div>
+
+                    {/* Footer */}
+                    <div className="px-4 pb-4 pt-2 border-t border-slate-850 flex items-center justify-between text-[11px] text-slate-400">
+                      <span className="truncate flex items-center gap-1">
+                        <BadgeCheck className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
+                        <span className="truncate">{item.authorName}</span>
+                      </span>
+                      <span className="text-amber-400 font-bold text-[10px] group-hover:translate-x-1 transition-transform flex items-center gap-0.5">
+                        <span>Pesan</span>
+                        <ArrowRight className="w-3 h-3" />
+                      </span>
+                    </div>
                   </div>
-                ))}
+                );
+              })}
             </div>
           </div>
         )}

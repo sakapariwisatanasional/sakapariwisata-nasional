@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { CulinarySouvenirItem, CurrentUser, KridaType } from '../../types';
 import { storage } from '../../services/storage';
+import { formatDriveImageUrl } from '../common/SakaLogo';
 
 interface CulinarySouvenirDetailModalProps {
   item: CulinarySouvenirItem | null;
@@ -137,8 +138,13 @@ export const CulinarySouvenirDetailModal: React.FC<CulinarySouvenirDetailModalPr
         {/* Cover Image & Category Badges */}
         <div className="relative h-52 sm:h-72 bg-slate-900 flex-shrink-0 overflow-hidden">
           <img
-            src={item.imageUrl}
+            src={formatDriveImageUrl(item.imageUrl) || (item.kind === 'KULINER' ? 'https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?w=800&auto=format&fit=crop&q=80' : 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&auto=format&fit=crop&q=80')}
             alt={item.name}
+            loading="lazy"
+            referrerPolicy="no-referrer"
+            onError={(e) => {
+              (e.target as HTMLImageElement).src = item.kind === 'KULINER' ? 'https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?w=800&auto=format&fit=crop&q=80' : 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&auto=format&fit=crop&q=80';
+            }}
             className="w-full h-full object-cover"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/30 to-black/40" />

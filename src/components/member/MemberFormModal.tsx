@@ -61,26 +61,74 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
   const [bio, setBio] = useState('');
   const [avatarUrl, setAvatarUrl] = useState('https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop&q=80');
   const [photoInputUrl, setPhotoInputUrl] = useState('');
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const [isDraggingPhoto, setIsDraggingPhoto] = useState(false);
+  const [photoUploadSource, setPhotoUploadSource] = useState<'FILE' | 'URL'>('FILE');
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const processAndCompressFile = (file: File) => {
+    if (!file.type.startsWith('image/')) {
+      alert('Mohon pilih berkas gambar yang valid (JPG, PNG, WEBP).');
+      return;
+    }
+    setIsUploadingPhoto(true);
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.src = event.target?.result as string;
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const maxDim = 800;
+        let width = img.width;
+        let height = img.height;
+        if (width > height) {
+          if (width > maxDim) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          }
+        } else {
+          if (height > maxDim) {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          setAvatarUrl(canvas.toDataURL('image/jpeg', 0.85));
+        } else {
+          setAvatarUrl(event.target?.result as string);
+        }
+        setIsUploadingPhoto(false);
+      };
+      img.onerror = () => {
+        setAvatarUrl(event.target?.result as string);
+        setIsUploadingPhoto(false);
+      };
+    };
+    reader.onerror = () => {
+      alert('Gagal membaca berkas foto.');
+      setIsUploadingPhoto(false);
+    };
+    reader.readAsDataURL(file);
+  };
 
   const handlePhotoFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (!file.type.startsWith('image/')) {
-        alert('Mohon pilih file gambar yang valid (JPG, PNG, WEBP).');
-        return;
-      }
-      if (file.size > 5 * 1024 * 1024) {
-        alert('Ukuran file foto maksimal 5MB.');
-        return;
-      }
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        if (event.target?.result) {
-          setAvatarUrl(event.target.result as string);
-        }
-      };
-      reader.readAsDataURL(file);
+      processAndCompressFile(file);
+    }
+  };
+
+  const handlePhotoDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDraggingPhoto(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) {
+      processAndCompressFile(file);
     }
   };
 
@@ -404,84 +452,170 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
               </div>
             </div>
 
-            {/* Avatar Picker with Upload and URL Support */}
-            <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 space-y-3">
+            {/* Avatar Picker with Upload, Drag&Drop, Camera, and URL Support */}
+            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-3">
               <div className="flex items-center justify-between">
-                <label className="block text-xs font-bold text-slate-800">Foto Resmi KTA Anggota</label>
-                <span className="text-[10px] text-slate-500">Mendukung upload file, link Drive/Web, atau sampel</span>
-              </div>
-              <div className="flex items-start gap-4">
-                <div className="relative group flex-shrink-0">
-                  <img
-                    src={avatarUrl}
-                    alt="Preview"
-                    className="w-16 h-20 object-cover rounded-xl border-2 border-emerald-500 shadow-md bg-slate-800"
-                  />
+                <div>
+                  <label className="block text-xs font-bold text-slate-900 font-heading">
+                    Pas Foto Resmi Anggota (KTA Digital & Fisik)
+                  </label>
+                  <p className="text-[11px] text-slate-500">
+                    Gunakan foto setengah badan berpakaian seragam Pramuka / rapi
+                  </p>
+                </div>
+                <div className="flex items-center bg-slate-200 p-0.5 rounded-lg text-[10px] font-bold">
                   <button
                     type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="absolute inset-0 bg-slate-900/60 opacity-0 group-hover:opacity-100 rounded-xl flex flex-col items-center justify-center text-white transition-opacity cursor-pointer"
+                    onClick={() => setPhotoUploadSource('FILE')}
+                    className={`px-2 py-1 rounded-md transition-all cursor-pointer ${
+                      photoUploadSource === 'FILE' 
+                        ? 'bg-white text-emerald-900 shadow-xs font-extrabold' 
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
                   >
-                    <Camera className="w-4 h-4 mb-0.5 text-emerald-300" />
-                    <span className="text-[8px] font-bold">Ganti</span>
+                    Upload File
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPhotoUploadSource('URL')}
+                    className={`px-2 py-1 rounded-md transition-all cursor-pointer ${
+                      photoUploadSource === 'URL' 
+                        ? 'bg-white text-emerald-900 shadow-xs font-extrabold' 
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    Link URL / Drive
                   </button>
                 </div>
-                
-                <div className="flex-1 space-y-2">
-                  <div className="flex items-center gap-2">
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept="image/*"
-                      onChange={handlePhotoFileUpload}
-                      className="hidden"
+              </div>
+
+              <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 pt-1">
+                {/* Photo Preview Badge */}
+                <div className="relative group flex-shrink-0">
+                  <div className="w-24 h-32 rounded-2xl overflow-hidden border-2 border-emerald-500 shadow-md bg-slate-900 relative">
+                    <img
+                      src={avatarUrl}
+                      alt="Preview Foto Anggota"
+                      className="w-full h-full object-cover"
                     />
+                    {isUploadingPhoto && (
+                      <div className="absolute inset-0 bg-slate-950/70 flex flex-col items-center justify-center text-white text-[10px] font-bold gap-1">
+                        <div className="w-5 h-5 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin" />
+                        <span>Memproses...</span>
+                      </div>
+                    )}
                     <button
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
-                      className="px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
+                      className="absolute inset-0 bg-slate-900/60 opacity-0 group-hover:opacity-100 rounded-2xl flex flex-col items-center justify-center text-white transition-opacity cursor-pointer"
                     >
-                      <Upload className="w-3.5 h-3.5" />
-                      <span>Upload Berkas Foto</span>
+                      <Camera className="w-5 h-5 mb-1 text-emerald-300" />
+                      <span className="text-[9px] font-bold">Ganti Foto</span>
                     </button>
                   </div>
+                  <span className="absolute -bottom-2 inset-x-0 mx-auto w-max px-2 py-0.5 bg-emerald-600 text-white text-[9px] font-extrabold rounded-full shadow-xs">
+                    Format KTA 3x4
+                  </span>
+                </div>
 
-                  <div className="flex items-center gap-2">
-                    <div className="relative flex-1">
-                      <LinkIcon className="w-3 h-3 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
-                      <input
-                        type="url"
-                        value={photoInputUrl}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          setPhotoInputUrl(val);
-                          if (val.trim()) {
-                            setAvatarUrl(formatGoogleDriveUrl(val.trim()));
-                          }
-                        }}
-                        placeholder="Tempel link foto Google Drive / Web..."
-                        className="w-full pl-7 pr-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs text-slate-800 outline-none focus:ring-1 focus:ring-emerald-500"
-                      />
+                {/* Upload Controls & Drop Area */}
+                <div className="flex-1 w-full space-y-2.5">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/png, image/jpeg, image/webp"
+                    onChange={handlePhotoFileUpload}
+                    className="hidden"
+                  />
+
+                  {photoUploadSource === 'FILE' ? (
+                    <div
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        setIsDraggingPhoto(true);
+                      }}
+                      onDragLeave={() => setIsDraggingPhoto(false)}
+                      onDrop={handlePhotoDrop}
+                      className={`border-2 border-dashed rounded-2xl p-3.5 transition-all text-center flex flex-col items-center justify-center gap-2 cursor-pointer ${
+                        isDraggingPhoto 
+                          ? 'border-emerald-500 bg-emerald-50/80 scale-[1.01]' 
+                          : 'border-slate-300 hover:border-emerald-500 bg-white hover:bg-emerald-50/30'
+                      }`}
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center">
+                        <Upload className="w-4 h-4" />
+                      </div>
+                      <div className="space-y-0.5">
+                        <p className="text-xs font-bold text-slate-800">
+                          Klik untuk memilih foto dari perangkat atau seret foto ke sini
+                        </p>
+                        <p className="text-[10px] text-slate-400">
+                          Mendukung JPG, PNG, WEBP (Kompresi otomatis hingga optimal)
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 pt-0.5">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            fileInputRef.current?.click();
+                          }}
+                          className="px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
+                        >
+                          <Camera className="w-3.5 h-3.5" />
+                          <span>Pilih / Ambil Foto</span>
+                        </button>
+                      </div>
                     </div>
-                  </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <label className="block text-[11px] font-bold text-slate-700">
+                        Tautan Foto Google Drive atau URL Web
+                      </label>
+                      <div className="relative">
+                        <LinkIcon className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                        <input
+                          type="url"
+                          value={photoInputUrl}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setPhotoInputUrl(val);
+                            if (val.trim()) {
+                              setAvatarUrl(formatGoogleDriveUrl(val.trim()));
+                            }
+                          }}
+                          placeholder="https://drive.google.com/file/d/... atau https://..."
+                          className="w-full pl-8 pr-3 py-2 bg-white border border-slate-300 rounded-xl text-xs text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+                        />
+                      </div>
+                      <p className="text-[10px] text-slate-400">
+                        *Jika menggunakan Google Drive, pastikan izin akses tautan disetel ke "Siapa saja yang memiliki link".
+                      </p>
+                    </div>
+                  )}
 
-                  <div className="flex items-center gap-1.5 pt-0.5">
-                    <span className="text-[10px] text-slate-500 mr-1">Sampel:</span>
-                    {sampleAvatars.map((url, i) => (
-                      <button
-                        type="button"
-                        key={i}
-                        onClick={() => {
-                          setAvatarUrl(url);
-                          setPhotoInputUrl('');
-                        }}
-                        className={`w-7 h-7 rounded-lg overflow-hidden border-2 transition-all cursor-pointer ${
-                          avatarUrl === url ? 'border-emerald-600 scale-105 shadow-xs' : 'border-transparent opacity-60 hover:opacity-100'
-                        }`}
-                      >
-                        <img src={url} alt="Option" className="w-full h-full object-cover" />
-                      </button>
-                    ))}
+                  {/* Sample Quick Avatars */}
+                  <div className="flex items-center gap-2 pt-1 border-t border-slate-200/80">
+                    <span className="text-[10px] font-semibold text-slate-500">Contoh Foto Resmi:</span>
+                    <div className="flex items-center gap-1.5">
+                      {sampleAvatars.map((url, i) => (
+                        <button
+                          type="button"
+                          key={i}
+                          onClick={() => {
+                            setAvatarUrl(url);
+                            setPhotoInputUrl('');
+                          }}
+                          className={`w-7 h-7 rounded-lg overflow-hidden border-2 transition-all cursor-pointer ${
+                            avatarUrl === url ? 'border-emerald-600 scale-105 shadow-xs' : 'border-transparent opacity-60 hover:opacity-100'
+                          }`}
+                          title={`Gunakan contoh foto ${i + 1}`}
+                        >
+                          <img src={url} alt="Option" className="w-full h-full object-cover" />
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 </div>
               </div>
