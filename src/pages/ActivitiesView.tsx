@@ -49,6 +49,7 @@ export const ActivitiesView: React.FC<ActivitiesViewProps> = ({
     'SUPER_ADMIN', 
     'ADMIN_PROVINCE', 
     'ADMIN_REGENCY', 
+    'ADMIN_BRANCH',
     'OPERATOR'
   ].includes(currentUser.role);
 
@@ -59,7 +60,7 @@ export const ActivitiesView: React.FC<ActivitiesViewProps> = ({
   const filteredActivities = useMemo(() => {
     return activitiesList.filter(a => {
       const matchCat = categoryFilter === 'ALL' || a.category === categoryFilter;
-      const matchLevel = levelFilter === 'ALL' || a.organizerLevel === levelFilter;
+      const matchLevel = levelFilter === 'ALL' || a.organizerLevel?.toUpperCase() === levelFilter.toUpperCase();
       const matchStatus = statusFilter === 'ALL' || a.status === statusFilter;
       const q = searchQuery.toLowerCase().trim();
       const matchQuery = !q ||
@@ -67,7 +68,8 @@ export const ActivitiesView: React.FC<ActivitiesViewProps> = ({
         a.description.toLowerCase().includes(q) ||
         a.locationName.toLowerCase().includes(q) ||
         a.provinceName.toLowerCase().includes(q) ||
-        a.organizerName.toLowerCase().includes(q);
+        (a.regencyName && a.regencyName.toLowerCase().includes(q)) ||
+        (a.organizerName && a.organizerName.toLowerCase().includes(q));
       return matchCat && matchLevel && matchStatus && matchQuery;
     });
   }, [activitiesList, categoryFilter, levelFilter, statusFilter, searchQuery]);

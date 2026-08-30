@@ -47,6 +47,8 @@ import { CulinarySouvenirFormModal } from './components/culinary/CulinarySouveni
 import { CulinarySouvenirDetailModal } from './components/culinary/CulinarySouvenirDetailModal';
 import { CulinarySouvenirGallerySection } from './components/dashboard/CulinarySouvenirGallerySection';
 import { DriveMediaRepositoryModal } from './components/common/DriveMediaRepositoryModal';
+import { ActivityDetailModal } from './components/activities/ActivityDetailModal';
+import { ActivityFormModal } from './components/activities/ActivityFormModal';
 
 export default function App() {
   // Current logged in user
@@ -78,6 +80,9 @@ export default function App() {
   const [isCulinaryFormOpen, setIsCulinaryFormOpen] = useState(false);
   const [editingCulinaryItem, setEditingCulinaryItem] = useState<CulinarySouvenirItem | null>(null);
   const [selectedCulinaryDetail, setSelectedCulinaryDetail] = useState<CulinarySouvenirItem | null>(null);
+  const [selectedActivityDetail, setSelectedActivityDetail] = useState<Activity | null>(null);
+  const [isActivityFormOpen, setIsActivityFormOpen] = useState(false);
+  const [editingActivity, setEditingActivity] = useState<Activity | null>(null);
   const [editingPhotoMember, setEditingPhotoMember] = useState<Member | null>(null);
   const [editingMember, setEditingMember] = useState<Member | null>(null);
   const [printingKtaMember, setPrintingKtaMember] = useState<Member | null>(null);
@@ -198,11 +203,17 @@ export default function App() {
           members={members}
           tours={tours}
           culinaryItems={culinaryItems}
+          activities={activities}
           onOpenLoginModal={() => handleOpenAuth('login')}
           onOpenRegisterModal={() => handleOpenAuth('register')}
           onOpenVerifyModal={(m) => setVerifyingMember(m)}
           onViewTourDetail={(t) => setSelectedTourDetail(t)}
           onSelectCulinaryDetail={(item) => setSelectedCulinaryDetail(item)}
+          onViewActivityDetail={(a) => setSelectedActivityDetail(a)}
+          onOpenActivityForm={() => {
+            setEditingActivity(null);
+            setIsActivityFormOpen(true);
+          }}
           onEnterDashboard={(tab) => setCurrentTab(tab || 'dashboard')}
         />
 
@@ -243,6 +254,38 @@ export default function App() {
           onDelete={(id) => {
             storage.deleteCulinarySouvenir(id, currentUser);
             setSelectedCulinaryDetail(null);
+          }}
+        />
+
+        {/* Activity Detail Modal for Landing View */}
+        <ActivityDetailModal
+          activity={selectedActivityDetail}
+          currentUser={currentUser}
+          onClose={() => setSelectedActivityDetail(null)}
+          onEditActivity={(act) => {
+            setSelectedActivityDetail(null);
+            setEditingActivity(act);
+            setIsActivityFormOpen(true);
+          }}
+          onDeleteActivity={(actId) => {
+            storage.deleteActivity(actId, currentUser);
+            setSelectedActivityDetail(null);
+          }}
+        />
+
+        {/* Activity Form Modal for Landing View (Super Admin & Operator) */}
+        <ActivityFormModal
+          isOpen={isActivityFormOpen}
+          currentUser={currentUser}
+          initialActivity={editingActivity}
+          onClose={() => {
+            setIsActivityFormOpen(false);
+            setEditingActivity(null);
+          }}
+          onSuccess={() => {
+            setIsActivityFormOpen(false);
+            setEditingActivity(null);
+            setActivities(storage.getActivities());
           }}
         />
       </div>
@@ -355,8 +398,10 @@ export default function App() {
                 currentUser={currentUser}
                 tours={tours}
                 provinces={provinces}
+                members={members}
                 onOpenTourFormModal={() => setIsTourFormModalOpen(true)}
                 onViewTourDetail={(t) => setSelectedTourDetail(t)}
+                onOpenVerifyModal={(m) => setVerifyingMember(m)}
               />
             )}
 
@@ -576,6 +621,38 @@ export default function App() {
           onClose={() => setIsDriveModalOpen(false)}
         />
       )}
+
+      {/* 16. Activity Detail Modal (Authenticated Views) */}
+      <ActivityDetailModal
+        activity={selectedActivityDetail}
+        currentUser={currentUser}
+        onClose={() => setSelectedActivityDetail(null)}
+        onEditActivity={(act) => {
+          setSelectedActivityDetail(null);
+          setEditingActivity(act);
+          setIsActivityFormOpen(true);
+        }}
+        onDeleteActivity={(actId) => {
+          storage.deleteActivity(actId, currentUser);
+          setSelectedActivityDetail(null);
+        }}
+      />
+
+      {/* 17. Activity Form Modal (Super Admin & Operator) */}
+      <ActivityFormModal
+        isOpen={isActivityFormOpen}
+        currentUser={currentUser}
+        initialActivity={editingActivity}
+        onClose={() => {
+          setIsActivityFormOpen(false);
+          setEditingActivity(null);
+        }}
+        onSuccess={() => {
+          setIsActivityFormOpen(false);
+          setEditingActivity(null);
+          setActivities(storage.getActivities());
+        }}
+      />
     </div>
   );
 }

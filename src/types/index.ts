@@ -242,7 +242,7 @@ export interface Activity {
   bannerUrl: string;
   coverImage?: string;
   category: string;
-  organizerLevel: 'NASIONAL' | 'PROVINSI' | 'KABUPATEN' | 'RANTING';
+  organizerLevel: 'INTERNASIONAL' | 'NASIONAL' | 'PROVINSI' | 'KABUPATEN' | 'RANTING';
   organizerName: string;
   
   locationName: string;
@@ -268,7 +268,7 @@ export interface Activity {
   contactEmail?: string;
   feeType?: 'GRATIS' | 'BERBAYAR' | 'SUBSIDI';
   feeAmount?: number;
-  uploadedByRole?: 'SUPER_ADMIN' | 'ADMIN_PROVINCE' | 'ADMIN_REGENCY' | 'OPERATOR';
+  uploadedByRole?: 'SUPER_ADMIN' | 'ADMIN_PROVINCE' | 'ADMIN_REGENCY' | 'ADMIN_BRANCH' | 'OPERATOR';
   uploadedByName?: string;
   uploadedAt?: string;
   registrationLink?: string;

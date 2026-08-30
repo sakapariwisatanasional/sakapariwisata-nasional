@@ -748,12 +748,286 @@ export const SHOWCASE_MEMBERS: Member[] = [
         isVerified: true
       }
     ],
-    certifications: [],
+    certifications: [
+      {
+        id: 'cert-5',
+        memberId: 'mem-dki-01',
+        name: 'Sertifikasi MICE & Event Manager BNSP',
+        certNumber: 'BNSP-MICE-3174-2023-019',
+        issuer: 'BNSP Indonesia',
+        issueDate: '2023-08-20',
+        isVerified: true
+      }
+    ],
     locationHistory: [],
     registeredAt: '2023-01-20T08:00:00Z',
     verifiedAt: '2023-01-21T10:00:00Z',
     verifiedBy: 'Super Admin Rohadi Wijaya',
     verificationToken: 'SAKA-VERIF-3174-000890'
+  },
+  {
+    id: 'mem-jatim-01',
+    userId: 'user-mem-dimas-jatim',
+    nationalMemberNumber: '35.13.04.000621',
+    fullName: 'Dimas Wicaksono, S.Tr.Par',
+    nikMasked: '351304******0009',
+    avatarUrl: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=300&auto=format&fit=crop&q=80',
+    gender: 'LAKI_LAKI',
+    birthPlace: 'Probolinggo',
+    birthDate: '1998-03-19',
+    phone: '081233445566',
+    email: 'dimas.wicaksono@sakapariwisata.id',
+    address: 'Jl. Raya Bromo, Sukapura, Kab. Probolinggo, Jawa Timur',
+    provinceId: '35',
+    provinceName: 'Jawa Timur',
+    regencyId: '35.13',
+    regencyName: 'Kabupaten Probolinggo',
+    districtId: '35.13.04',
+    districtName: 'Sukapura',
+    branchId: 'br-sukapura-01',
+    branchName: 'Ranting Sukapura',
+    gugusDepan: 'Gudep Saka Pariwisata Bromo Tengger',
+    joinYear: 2018,
+    status: 'ACTIVE',
+    currentPosition: 'Pamong Krida Pemandu Wisata Vulkanik Kwarda Jatim',
+    krida: 'Krida Pemandu',
+    educationLevel: 'D4 Manajemen Pariwisata',
+    occupation: 'Senior Bromo Mountain & Geotour Guide',
+    bio: 'Pemandu gunung dan ekowisata vulkanik Taman Nasional Bromo Tengger Semeru. Terbiasa memandu tur sunrise, jeep safari lautan pasir, serta edukasi tradisi Yadnya Kasada suku Tengger.',
+    skills: [
+      {
+        id: 'sk-11',
+        skillId: 'skill-tour-guide',
+        skillName: 'Pemandu Wisata Gunung & Vulkanik BNSP',
+        category: 'Pemanduan & Tour Guide',
+        proficiency: 'EXPERT',
+        yearsOfExperience: 7,
+        isVerified: true
+      },
+      {
+        id: 'sk-12',
+        skillId: 'skill-storytelling',
+        skillName: 'Storytelling Budaya & Adat Tengger Bromo',
+        category: 'Budaya & Storytelling',
+        proficiency: 'EXPERT',
+        yearsOfExperience: 6,
+        isVerified: true
+      }
+    ],
+    certifications: [
+      {
+        id: 'cert-6',
+        memberId: 'mem-jatim-01',
+        name: 'Sertifikasi Pemandu Gunung Madya BNSP / APGI',
+        certNumber: 'APGI-BNSP-3513-2024-008',
+        issuer: 'Asosiasi Pemandu Gunung Indonesia',
+        issueDate: '2024-02-10',
+        isVerified: true
+      }
+    ],
+    locationHistory: [],
+    registeredAt: '2023-02-15T08:00:00Z',
+    verifiedAt: '2023-02-16T10:00:00Z',
+    verifiedBy: 'Super Admin Rohadi Wijaya',
+    verificationToken: 'SAKA-VERIF-3513-000621'
+  },
+  {
+    id: 'mem-sumbar-01',
+    userId: 'user-mem-annisa-padang',
+    nationalMemberNumber: '13.75.01.000450',
+    fullName: 'Annisa Fitri, S.Hum',
+    nikMasked: '137501******0004',
+    avatarUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=300&auto=format&fit=crop&q=80',
+    gender: 'PEREMPUAN',
+    birthPlace: 'Bukittinggi',
+    birthDate: '1999-12-04',
+    phone: '081366778899',
+    email: 'annisa.fitri@sakapariwisata.id',
+    address: 'Jl. Jam Gadang No. 10, Kota Bukittinggi, Sumatera Barat',
+    provinceId: '13',
+    provinceName: 'Sumatera Barat',
+    regencyId: '13.75',
+    regencyName: 'Kota Bukittinggi',
+    districtId: '13.75.01',
+    districtName: 'Guguk Panjang',
+    branchId: 'br-bukittinggi-01',
+    branchName: 'Ranting Guguk Panjang',
+    gugusDepan: 'Gudep Jam Gadang Pariwisata',
+    joinYear: 2019,
+    status: 'ACTIVE',
+    currentPosition: 'Pamong Krida Kuliner & Gastronomi Minangkabau',
+    krida: 'Krida Kuliner & Cinderamata',
+    educationLevel: 'S1 Sejarah & Budaya Minangkabau',
+    occupation: 'Culinary Heritage Guide & Storyteller',
+    bio: 'Pemandu wisata budaya dan gastro-tourism Minangkabau. Mengembangkan tur kuliner rendang autentik, eksplorasi Ngarai Sianok, serta narasi arsitektur Rumah Gadang.',
+    skills: [
+      {
+        id: 'sk-13',
+        skillId: 'skill-kuliner',
+        skillName: 'Gastronomi Rendang & Kuliner Khas Minang',
+        category: 'Hospitality & Kuliner',
+        proficiency: 'EXPERT',
+        yearsOfExperience: 5,
+        isVerified: true
+      },
+      {
+        id: 'sk-14',
+        skillId: 'skill-storytelling',
+        skillName: 'Storytelling Warisan Cagar Budaya Jam Gadang',
+        category: 'Budaya & Storytelling',
+        proficiency: 'ADVANCED',
+        yearsOfExperience: 4,
+        isVerified: true
+      }
+    ],
+    certifications: [
+      {
+        id: 'cert-7',
+        memberId: 'mem-sumbar-01',
+        name: 'Pemandu Wisata Kuliner Nusantara Terakreditasi',
+        certNumber: 'KEMENPAREKRAF-SUMBAR-2023-112',
+        issuer: 'Kemenparekraf RI',
+        issueDate: '2023-09-12',
+        isVerified: true
+      }
+    ],
+    locationHistory: [],
+    registeredAt: '2023-03-10T08:00:00Z',
+    verifiedAt: '2023-03-11T10:00:00Z',
+    verifiedBy: 'Super Admin Rohadi Wijaya',
+    verificationToken: 'SAKA-VERIF-1375-000450'
+  },
+  {
+    id: 'mem-sulsel-01',
+    userId: 'user-mem-andi-toraja',
+    nationalMemberNumber: '73.18.02.000392',
+    fullName: 'Andi Rahmat Patandianan',
+    nikMasked: '731802******0006',
+    avatarUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=300&auto=format&fit=crop&q=80',
+    gender: 'LAKI_LAKI',
+    birthPlace: 'Rantepao',
+    birthDate: '1997-06-25',
+    phone: '081244556677',
+    email: 'andi.rahmat@sakapariwisata.id',
+    address: 'Kete Kesu, Rantepao, Tana Toraja, Sulawesi Selatan',
+    provinceId: '73',
+    provinceName: 'Sulawesi Selatan',
+    regencyId: '73.18',
+    regencyName: 'Kabupaten Tana Toraja',
+    districtId: '73.18.02',
+    districtName: 'Mengkendek',
+    branchId: 'br-toraja-01',
+    branchName: 'Ranting Mengkendek',
+    gugusDepan: 'Gudep Toraja Heritage',
+    joinYear: 2017,
+    status: 'ACTIVE',
+    currentPosition: 'Pamong Krida Pemandu Budaya Kwarda Sulsel',
+    krida: 'Krida Pemandu',
+    educationLevel: 'S1 Destinasi Pariwisata',
+    occupation: 'Toraja Heritage & Eco-Trek Guide',
+    bio: 'Pemandu spesialis upacara adat Rambu Solo, arsitektur Tongkonan, tenun Sa’dan, dan trekking kopi arabika organik Toraja.',
+    skills: [
+      {
+        id: 'sk-15',
+        skillId: 'skill-tour-guide',
+        skillName: 'Pemandu Budaya & Ekowisata Toraja BNSP',
+        category: 'Pemanduan & Tour Guide',
+        proficiency: 'EXPERT',
+        yearsOfExperience: 6,
+        isVerified: true
+      },
+      {
+        id: 'sk-16',
+        skillId: 'skill-bahasa-inggris',
+        skillName: 'English Tour Guide (Fluent)',
+        category: 'Pemanduan & Tour Guide',
+        proficiency: 'ADVANCED',
+        yearsOfExperience: 5,
+        isVerified: true
+      }
+    ],
+    certifications: [
+      {
+        id: 'cert-8',
+        memberId: 'mem-sulsel-01',
+        name: 'Lisensi HPI Sulawesi Selatan Tingkat Madya',
+        certNumber: 'HPI-SULSEL-2023-044',
+        issuer: 'DPD HPI Sulawesi Selatan',
+        issueDate: '2023-04-18',
+        isVerified: true
+      }
+    ],
+    locationHistory: [],
+    registeredAt: '2023-04-01T08:00:00Z',
+    verifiedAt: '2023-04-02T10:00:00Z',
+    verifiedBy: 'Super Admin Rohadi Wijaya',
+    verificationToken: 'SAKA-VERIF-7318-000392'
+  },
+  {
+    id: 'mem-ntt-01',
+    userId: 'user-mem-florentina-labuan',
+    nationalMemberNumber: '53.15.01.000219',
+    fullName: 'Florentina Meo, S.Par',
+    nikMasked: '531501******0008',
+    avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop&q=80',
+    gender: 'PEREMPUAN',
+    birthPlace: 'Labuan Bajo',
+    birthDate: '2000-08-11',
+    phone: '081288990011',
+    email: 'florentina.meo@sakapariwisata.id',
+    address: 'Kawasan Wisata Marina, Labuan Bajo, Manggarai Barat, NTT',
+    provinceId: '53',
+    provinceName: 'Nusa Tenggara Timur',
+    regencyId: '53.15',
+    regencyName: 'Kabupaten Manggarai Barat',
+    districtId: '53.15.01',
+    districtName: 'Komodo',
+    branchId: 'br-komodo-01',
+    branchName: 'Ranting Komodo',
+    gugusDepan: 'Gudep Bahari Labuan Bajo',
+    joinYear: 2019,
+    status: 'ACTIVE',
+    currentPosition: 'Pamong Krida Bahari & Ekowisata Komodo',
+    krida: 'Krida Pemandu',
+    educationLevel: 'S1 Kepariwisataan Bahari',
+    occupation: 'Marine Eco-Guide & Dive Coordinator',
+    bio: 'Pemandu ekowisata bahari Taman Nasional Komodo, edukasi pelestarian terumbu karang Manta Point, dan pemandu trekking Pulau Padar berlisensi.',
+    skills: [
+      {
+        id: 'sk-17',
+        skillId: 'skill-ekowisata',
+        skillName: 'Ekowisata Bahari & Konservasi Taman Nasional Komodo',
+        category: 'Ekowisata & Alam',
+        proficiency: 'EXPERT',
+        yearsOfExperience: 5,
+        isVerified: true
+      },
+      {
+        id: 'sk-18',
+        skillId: 'skill-bahasa-inggris',
+        skillName: 'English & Mandarin Eco-Guide',
+        category: 'Pemanduan & Tour Guide',
+        proficiency: 'ADVANCED',
+        yearsOfExperience: 4,
+        isVerified: true
+      }
+    ],
+    certifications: [
+      {
+        id: 'cert-9',
+        memberId: 'mem-ntt-01',
+        name: 'Sertifikasi Divemaster & Marine Guide BNSP',
+        certNumber: 'BNSP-MAR-5315-2024-001',
+        issuer: 'BNSP & Lembaga Sertifikasi Profesi Bahari',
+        issueDate: '2024-01-20',
+        isVerified: true
+      }
+    ],
+    locationHistory: [],
+    registeredAt: '2023-05-15T08:00:00Z',
+    verifiedAt: '2023-05-16T10:00:00Z',
+    verifiedBy: 'Super Admin Rohadi Wijaya',
+    verificationToken: 'SAKA-VERIF-5315-000219'
   }
 ];
 
@@ -992,6 +1266,46 @@ export const SHOWCASE_ACTIVITIES: Activity[] = [
     uploadedByRole: 'SUPER_ADMIN',
     uploadedByName: 'Kak Rohadi Wijaya (Super Admin Kwarnas)',
     uploadedAt: '2026-02-25T13:00:00Z',
+    featured: true
+  },
+  {
+    id: 'act-intl-01',
+    title: 'ASEAN & Asia-Pacific Scout Eco-Tourism Exchange & Youth Summit 2026',
+    slug: 'asean-asia-pacific-scout-ecotourism-summit-2026',
+    description: 'Konferensi dan lokakarya pemuda Pramuka internasional kawasan Asia Pasifik tentang konservasi ekowisata bahari dan pegunungan, sertifikasi interpreter geowisata lintas negara, dan diplomasi kebudayaan nusantara.',
+    bannerUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=1200&auto=format&fit=crop&q=80',
+    coverImage: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=1200&auto=format&fit=crop&q=80',
+    category: 'Musyawarah & Lokakarya',
+    organizerLevel: 'INTERNASIONAL',
+    organizerName: 'Kwartir Nasional Gerakan Pramuka & Asia-Pacific Scout Region (WOSM)',
+    locationName: 'Kawasan Wisata Marina & Komodo Convention Center',
+    locationAddress: 'Labuan Bajo, Manggarai Barat, Nusa Tenggara Timur',
+    provinceId: '53',
+    provinceName: 'Nusa Tenggara Timur',
+    regencyId: '53.15',
+    regencyName: 'Kabupaten Manggarai Barat',
+    scope: 'Internasional (ASEAN & Asia Pacific Scouts)',
+    startDate: '2026-11-12',
+    endDate: '2026-11-16',
+    timeString: '08.00 - 18.00 WITA (5 Hari)',
+    capacity: 250,
+    maxParticipants: 250,
+    registeredCount: 140,
+    isPublic: true,
+    status: 'OPEN_REGISTRATION',
+    requirements: [
+      'Anggota Pramuka Penegak/Pandega/Pembina dengan kemampuan Bahasa Inggris aktif',
+      'Surat Rekomendasi Kwartir Nasional / NSO',
+      'Paspor / Identitas Resmi yang masih berlaku'
+    ],
+    contactPerson: 'Kak Florentina Meo (Liaison Officer Internasional)',
+    contactPhone: '081288990011',
+    contactEmail: 'international@sakapariwisata.id',
+    feeType: 'BERBAYAR',
+    feeAmount: 350000,
+    uploadedByRole: 'SUPER_ADMIN',
+    uploadedByName: 'Kak Rohadi Wijaya (Super Admin Kwarnas)',
+    uploadedAt: '2026-03-01T10:00:00Z',
     featured: true
   }
 ];

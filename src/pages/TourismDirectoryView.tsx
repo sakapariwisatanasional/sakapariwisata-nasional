@@ -8,26 +8,33 @@ import {
   Sparkles, 
   Layers, 
   SlidersHorizontal,
-  CheckCircle2
+  CheckCircle2,
+  Users,
+  Award
 } from 'lucide-react';
-import { TourPackage, TourCategory, CurrentUser, Province } from '../types';
+import { TourPackage, TourCategory, CurrentUser, Province, Member } from '../types';
 import { TourPackageCard } from '../components/tourism/TourPackageCard';
 import { storage } from '../services/storage';
+import { CompetentGuidesSection } from '../components/common/CompetentGuidesSection';
 
 interface TourismDirectoryViewProps {
   currentUser: CurrentUser;
   tours: TourPackage[];
   provinces: Province[];
+  members: Member[];
   onOpenTourFormModal: () => void;
   onViewTourDetail: (tour: TourPackage) => void;
+  onOpenVerifyModal: (member: Member) => void;
 }
 
 export const TourismDirectoryView: React.FC<TourismDirectoryViewProps> = ({
   currentUser,
   tours,
   provinces,
+  members,
   onOpenTourFormModal,
-  onViewTourDetail
+  onViewTourDetail,
+  onOpenVerifyModal
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
@@ -197,6 +204,20 @@ export const TourismDirectoryView: React.FC<TourismDirectoryViewProps> = ({
           ))}
         </div>
       )}
+
+      {/* Guide & Competent Members Section based on selected destination province */}
+      <div className="mt-12 pt-10 border-t border-slate-200">
+        <CompetentGuidesSection
+          members={members}
+          provinces={provinces}
+          onOpenVerifyModal={onOpenVerifyModal}
+          selectedProvinceId={selectedProvinceId}
+          onProvinceChange={(pId) => setSelectedProvinceId(pId)}
+          theme="light"
+          title="Pemandu & Fasilitator Terdekat untuk Destinasi Anda"
+          subtitle="Hubungi langsung kader Pramuka Saka Pariwisata di wilayah tujuan untuk pendampingan pemanduan, ekowisata, storytelling sejarah, dan informasi lokal."
+        />
+      </div>
     </div>
   );
 };

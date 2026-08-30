@@ -935,6 +935,59 @@ class StorageService {
     const activities = this.getActivities();
     const currentUser = this.getCurrentUser();
     
+    // Strict Scope & Territorial Validation Rules:
+    // 1. Only SUPER_ADMIN can create INTERNASIONAL or NASIONAL scale events
+    // 2. Operators can only register events within their territory and permitted scale
+    let allowedLevel: 'INTERNASIONAL' | 'NASIONAL' | 'PROVINSI' | 'KABUPATEN' | 'RANTING' = 
+      activityData.organizerLevel || 'PROVINSI';
+
+    let enforcedProvinceId = activityData.provinceId || '32';
+    let enforcedProvinceName = activityData.provinceName || 'Jawa Barat';
+    let enforcedRegencyId = activityData.regencyId || '';
+    let enforcedRegencyName = activityData.regencyName || '';
+    let enforcedScope = activityData.scope || 'Terbuka untuk Kader Saka Pariwisata';
+
+    if (currentUser.role === 'SUPER_ADMIN') {
+      allowedLevel = activityData.organizerLevel || 'NASIONAL';
+      enforcedProvinceId = activityData.provinceId || '32';
+      enforcedProvinceName = activityData.provinceName || 'Jawa Barat';
+      enforcedRegencyId = activityData.regencyId || '';
+      enforcedRegencyName = activityData.regencyName || '';
+      enforcedScope = activityData.scope || (allowedLevel === 'INTERNASIONAL' ? 'Skala Internasional' : 'Skala Nasional');
+    } else if (currentUser.role === 'ADMIN_PROVINCE') {
+      // Province Operator: Cannot make NASIONAL / INTERNASIONAL
+      if (allowedLevel === 'NASIONAL' || allowedLevel === 'INTERNASIONAL') {
+        allowedLevel = 'PROVINSI';
+      }
+      // Lock province to operator's territory
+      const opProvId = currentUser.jurisdictionId || '32';
+      enforcedProvinceId = opProvId;
+      const provObj = this.getProvinces().find(p => p.id === opProvId);
+      enforcedProvinceName = provObj ? provObj.name : (currentUser.jurisdictionName?.replace('Kwarda ', '') || 'Jawa Barat');
+      enforcedScope = `Wilayah Kwarda ${enforcedProvinceName}`;
+    } else if (currentUser.role === 'ADMIN_REGENCY') {
+      // Regency Operator: Cannot make NASIONAL / INTERNASIONAL / PROVINSI
+      if (allowedLevel === 'NASIONAL' || allowedLevel === 'INTERNASIONAL' || allowedLevel === 'PROVINSI') {
+        allowedLevel = 'KABUPATEN';
+      }
+      const opRegId = currentUser.jurisdictionId || '32.04';
+      enforcedRegencyId = opRegId;
+      // Derive province from regency code
+      const provCode = opRegId.split('.')[0] || '32';
+      enforcedProvinceId = provCode;
+      const provObj = this.getProvinces().find(p => p.id === provCode);
+      enforcedProvinceName = provObj ? provObj.name : 'Jawa Barat';
+      enforcedRegencyName = currentUser.jurisdictionName?.replace('Kwarcab ', '') || 'Kabupaten Bandung';
+      enforcedScope = `Wilayah Kwarcab ${enforcedRegencyName}`;
+    } else if (currentUser.role === 'ADMIN_BRANCH') {
+      allowedLevel = 'RANTING';
+      enforcedProvinceId = '32';
+      enforcedProvinceName = 'Jawa Barat';
+      enforcedRegencyId = '32.04';
+      enforcedRegencyName = 'Kabupaten Bandung';
+      enforcedScope = `Wilayah ${currentUser.jurisdictionName || 'Kwarran Ciwidey'}`;
+    }
+
     const newActivity: Activity = {
       id: `act-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
       title: activityData.title || 'Agenda Saka Pariwisata',
@@ -943,15 +996,15 @@ class StorageService {
       bannerUrl: activityData.bannerUrl || activityData.coverImage || 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=1200&auto=format&fit=crop&q=80',
       coverImage: activityData.coverImage || activityData.bannerUrl || 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=1200&auto=format&fit=crop&q=80',
       category: activityData.category || 'Perkemahan & Kemah Bakti',
-      organizerLevel: activityData.organizerLevel || (currentUser.role === 'SUPER_ADMIN' ? 'NASIONAL' : 'PROVINSI'),
+      organizerLevel: allowedLevel,
       organizerName: activityData.organizerName || (currentUser.role === 'SUPER_ADMIN' ? 'Kwartir Nasional Gerakan Pramuka' : `Pimpinan Saka Pariwisata ${currentUser.jurisdictionName || ''}`),
       locationName: activityData.locationName || 'Lokasi Kegiatan',
       locationAddress: activityData.locationAddress || '',
-      provinceId: activityData.provinceId || '32',
-      provinceName: activityData.provinceName || 'Jawa Barat',
-      regencyId: activityData.regencyId || '',
-      regencyName: activityData.regencyName || '',
-      scope: activityData.scope || 'Terbuka untuk Kader Saka Pariwisata',
+      provinceId: enforcedProvinceId,
+      provinceName: enforcedProvinceName,
+      regencyId: enforcedRegencyId,
+      regencyName: enforcedRegencyName,
+      scope: enforcedScope,
       startDate: activityData.startDate || new Date().toISOString().split('T')[0],
       endDate: activityData.endDate || new Date(Date.now() + 86400000 * 2).toISOString().split('T')[0],
       timeString: activityData.timeString || '08:00 WIB - Selesai',
@@ -974,7 +1027,7 @@ class StorageService {
       uploadedByName: `${currentUser.name} (${currentUser.role === 'SUPER_ADMIN' ? 'Super Admin Kwarnas' : 'Operator ' + (currentUser.jurisdictionName || 'Kwartir')})`,
       uploadedAt: new Date().toISOString(),
       registrationLink: activityData.registrationLink || '',
-      featured: activityData.featured ?? false
+      featured: activityData.featured ?? (allowedLevel === 'NASIONAL' || allowedLevel === 'INTERNASIONAL')
     };
 
     activities.unshift(newActivity);
@@ -987,7 +1040,7 @@ class StorageService {
       'CREATE_ACTIVITY',
       'ACTIVITY',
       newActivity.id,
-      `Mengunggah agenda kegiatan baru: "${newActivity.title}" (${newActivity.organizerLevel})`
+      `Mengunggah agenda kegiatan baru: "${newActivity.title}" (Skala: ${newActivity.organizerLevel} - ${newActivity.provinceName})`
     );
 
     this.notify();
@@ -999,14 +1052,24 @@ class StorageService {
     const idx = activities.findIndex(a => a.id === activityId);
     if (idx === -1) return null;
 
+    const currentUser = this.getCurrentUser();
+
+    // Prevent non-superadmin from escalating level to NASIONAL or INTERNASIONAL
+    let updatedLevel = updates.organizerLevel || activities[idx].organizerLevel;
+    if (currentUser.role !== 'SUPER_ADMIN' && (updatedLevel === 'NASIONAL' || updatedLevel === 'INTERNASIONAL')) {
+      updatedLevel = activities[idx].organizerLevel === 'NASIONAL' || activities[idx].organizerLevel === 'INTERNASIONAL' 
+        ? 'PROVINSI' 
+        : activities[idx].organizerLevel;
+    }
+
     activities[idx] = {
       ...activities[idx],
-      ...updates
+      ...updates,
+      organizerLevel: updatedLevel
     };
 
     localStorage.setItem(STORAGE_KEYS.ACTIVITIES, JSON.stringify(activities));
 
-    const currentUser = this.getCurrentUser();
     this.addAuditLog(
       currentUser.id,
       currentUser.name,
@@ -1021,7 +1084,7 @@ class StorageService {
     return activities[idx];
   }
 
-  public deleteActivity(activityId: string): boolean {
+  public deleteActivity(activityId: string, user?: CurrentUser): boolean {
     const activities = this.getActivities();
     const act = activities.find(a => a.id === activityId);
     if (!act) return false;
@@ -1029,7 +1092,7 @@ class StorageService {
     const filtered = activities.filter(a => a.id !== activityId);
     localStorage.setItem(STORAGE_KEYS.ACTIVITIES, JSON.stringify(filtered));
 
-    const currentUser = this.getCurrentUser();
+    const currentUser = user || this.getCurrentUser();
     this.addAuditLog(
       currentUser.id,
       currentUser.name,

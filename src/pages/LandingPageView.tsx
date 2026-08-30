@@ -28,23 +28,30 @@ import {
   TreePine,
   ShoppingBag,
   BadgeCheck,
-  Check
+  Check,
+  LayoutDashboard
 } from 'lucide-react';
-import { Member, TourPackage, CulinarySouvenirItem, CurrentUser } from '../types';
+import { Member, TourPackage, CulinarySouvenirItem, CurrentUser, Activity } from '../types';
 import { SakaLogo, formatDriveImageUrl } from '../components/common/SakaLogo';
 import { DEFAULT_SPREADSHEET_URL } from '../services/spreadsheetService';
 import { GOOGLE_DRIVE_MAIN_FOLDER } from '../services/driveRepository';
+import { CompetentGuidesSection } from '../components/common/CompetentGuidesSection';
+import { LandingActivitiesSection } from '../components/activities/LandingActivitiesSection';
+import { PROVINCES_DATA } from '../data/indonesiaTerritories';
 
 interface LandingPageViewProps {
   currentUser: CurrentUser;
   members: Member[];
   tours: TourPackage[];
   culinaryItems: CulinarySouvenirItem[];
+  activities: Activity[];
   onOpenLoginModal: () => void;
   onOpenRegisterModal: () => void;
   onOpenVerifyModal: (member: Member) => void;
   onViewTourDetail: (tour: TourPackage) => void;
   onSelectCulinaryDetail: (item: CulinarySouvenirItem) => void;
+  onViewActivityDetail: (activity: Activity) => void;
+  onOpenActivityForm?: () => void;
   onEnterDashboard: (tab?: string) => void;
 }
 
@@ -53,11 +60,14 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
   members,
   tours,
   culinaryItems,
+  activities,
   onOpenLoginModal,
   onOpenRegisterModal,
   onOpenVerifyModal,
   onViewTourDetail,
   onSelectCulinaryDetail,
+  onViewActivityDetail,
+  onOpenActivityForm,
   onEnterDashboard
 }) => {
   const [quickVerifyTerm, setQuickVerifyTerm] = useState('');
@@ -147,32 +157,37 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
 
         {/* Action Controls */}
         <div className="flex items-center gap-2 sm:gap-3">
-          <button
-            type="button"
-            onClick={onOpenLoginModal}
-            className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold border border-slate-700 transition-all flex items-center gap-1.5 cursor-pointer"
-          >
-            <Lock className="w-3.5 h-3.5 text-purple-400" />
-            <span>Masuk / Login</span>
-          </button>
+          {currentUser && currentUser.role !== 'PUBLIC' ? (
+            <button
+              type="button"
+              onClick={() => onEnterDashboard(currentUser.role === 'MEMBER' ? 'my-card' : 'dashboard')}
+              className="px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white rounded-xl text-xs font-bold shadow-md shadow-purple-950/40 transition-all flex items-center gap-1.5 cursor-pointer"
+            >
+              <LayoutDashboard className="w-3.5 h-3.5 text-amber-300" />
+              <span>Panel {currentUser.role === 'MEMBER' ? 'KTA Anggota' : 'Dashboard'} ({currentUser.name.split(' ')[0]})</span>
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          ) : (
+            <>
+              <button
+                type="button"
+                onClick={onOpenLoginModal}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold border border-slate-700 transition-all flex items-center gap-1.5 cursor-pointer"
+              >
+                <Lock className="w-3.5 h-3.5 text-purple-400" />
+                <span>Masuk / Login</span>
+              </button>
 
-          <button
-            type="button"
-            onClick={onOpenRegisterModal}
-            className="px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white rounded-xl text-xs font-bold shadow-md shadow-purple-950/40 transition-all flex items-center gap-1.5 cursor-pointer"
-          >
-            <UserPlus className="w-3.5 h-3.5" />
-            <span>Daftar Anggota</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => onEnterDashboard('dashboard')}
-            className="hidden lg:flex items-center gap-1.5 px-3.5 py-2 bg-purple-950 hover:bg-purple-900 text-purple-200 border border-purple-800 rounded-xl text-xs font-bold transition-all cursor-pointer"
-          >
-            <span>Buka Dashboard</span>
-            <ChevronRight className="w-3.5 h-3.5" />
-          </button>
+              <button
+                type="button"
+                onClick={onOpenRegisterModal}
+                className="px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white rounded-xl text-xs font-bold shadow-md shadow-purple-950/40 transition-all flex items-center gap-1.5 cursor-pointer"
+              >
+                <UserPlus className="w-3.5 h-3.5" />
+                <span>Daftar Anggota</span>
+              </button>
+            </>
+          )}
         </div>
       </nav>
 
@@ -315,7 +330,26 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
         </div>
       </section>
 
-      {/* 6. PAKET WISATA & KULINER SPOTLIGHT */}
+      {/* 6. PREVIEW ANGGOTA BERKOMPETENSI & PEMANDU TERDEKAT */}
+      <CompetentGuidesSection
+        members={members}
+        provinces={PROVINCES_DATA}
+        onOpenVerifyModal={onOpenVerifyModal}
+        theme="dark"
+        title="Temukan Pemandu & Kader Saka Terdekat dengan Wilayah Anda"
+        subtitle="Hubungi langsung anggota dan pamong Saka Pariwisata yang memiliki lisensi BNSP, sertifikasi keahlian ekowisata, pemandu budaya, dan cinderamata di wilayah terdekat."
+      />
+
+      {/* 7. AGENDA KEGIATAN & EVENT SAKA PARIWISATA */}
+      <LandingActivitiesSection
+        activities={activities}
+        currentUser={currentUser}
+        onViewActivityDetail={onViewActivityDetail}
+        onOpenActivityForm={onOpenActivityForm}
+        onEnterDashboard={onEnterDashboard}
+      />
+
+      {/* 8. PAKET WISATA & KULINER SPOTLIGHT */}
       <section className="py-16 px-4 sm:px-8 max-w-7xl mx-auto space-y-8 border-t border-slate-800">
         {/* Header & Controls */}
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
@@ -335,15 +369,23 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
           {/* Action Links */}
           <div className="flex items-center gap-3 flex-wrap">
             <button
-              onClick={() => onEnterDashboard('tours')}
-              className="inline-flex items-center gap-1.5 px-4 py-2 bg-purple-900/60 hover:bg-purple-900 text-purple-200 border border-purple-700/60 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs"
+              onClick={() => setGalleryTab('TOURS')}
+              className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs ${
+                galleryTab === 'TOURS'
+                  ? 'bg-purple-600 text-white shadow-md shadow-purple-950/40'
+                  : 'bg-purple-900/60 hover:bg-purple-900 text-purple-200 border border-purple-700/60'
+              }`}
             >
-              <span>Direktori Wisata</span>
+              <span>Paket Wisata ({publishedTours.length})</span>
               <ArrowRight className="w-3.5 h-3.5" />
             </button>
             <button
-              onClick={() => onEnterDashboard('culinary-souvenirs')}
-              className="inline-flex items-center gap-1.5 px-4 py-2 bg-amber-950/60 hover:bg-amber-900/80 text-amber-300 border border-amber-700/60 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs"
+              onClick={() => setGalleryTab('ALL')}
+              className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs ${
+                galleryTab === 'ALL'
+                  ? 'bg-amber-600 text-white shadow-md'
+                  : 'bg-amber-950/60 hover:bg-amber-900/80 text-amber-300 border border-amber-700/60'
+              }`}
             >
               <span>Galeri 4 Krida</span>
               <ArrowRight className="w-3.5 h-3.5" />
@@ -660,13 +702,17 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
           </div>
 
           <div className="flex items-center gap-4 flex-wrap justify-center">
-            <button
-              onClick={() => onEnterDashboard('dashboard')}
-              className="hover:text-white transition-colors cursor-pointer"
-            >
-              Dashboard Pengurus
-            </button>
-            <span className="text-slate-700">|</span>
+            {currentUser && currentUser.role !== 'PUBLIC' ? (
+              <>
+                <button
+                  onClick={() => onEnterDashboard(currentUser.role === 'MEMBER' ? 'my-card' : 'dashboard')}
+                  className="hover:text-white transition-colors cursor-pointer text-purple-300 font-semibold"
+                >
+                  Panel {currentUser.role === 'MEMBER' ? 'KTA Anggota' : 'Dashboard'}
+                </button>
+                <span className="text-slate-700">|</span>
+              </>
+            ) : null}
             <button
               onClick={onOpenLoginModal}
               className="hover:text-white transition-colors cursor-pointer"
@@ -678,7 +724,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
               onClick={onOpenRegisterModal}
               className="hover:text-white transition-colors cursor-pointer"
             >
-              Daftar Anggota
+              Daftar Anggota Baru
             </button>
           </div>
 

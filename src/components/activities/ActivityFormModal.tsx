@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   X, 
   CalendarDays, 
@@ -14,10 +14,14 @@ import {
   Sparkles,
   ShieldCheck,
   CheckCircle2,
-  Info
+  Info,
+  Lock,
+  Globe,
+  AlertCircle
 } from 'lucide-react';
 import { Activity, CurrentUser, Province } from '../../types';
 import { storage } from '../../services/storage';
+import { REGENCIES_DATA } from '../../data/indonesiaTerritories';
 
 interface ActivityFormModalProps {
   isOpen: boolean;
@@ -54,9 +58,42 @@ export const ActivityFormModal: React.FC<ActivityFormModalProps> = ({
 }) => {
   const provinces = storage.getProvinces();
 
+  const isSuperAdmin = currentUser.role === 'SUPER_ADMIN';
+  const isProvinceAdmin = currentUser.role === 'ADMIN_PROVINCE';
+  const isRegencyAdmin = currentUser.role === 'ADMIN_REGENCY';
+  const isBranchAdmin = currentUser.role === 'ADMIN_BRANCH';
+
+  // Allowed scales based on role
+  const availableLevels = useMemo(() => {
+    if (isSuperAdmin) {
+      return [
+        { value: 'INTERNASIONAL', label: '🌟 Tingkat Internasional (WOSM / ASEAN / Global)' },
+        { value: 'NASIONAL', label: '🇮🇩 Tingkat Nasional (Kwartir Nasional)' },
+        { value: 'PROVINSI', label: '🏛️ Tingkat Daerah / Provinsi (Kwarda)' },
+        { value: 'KABUPATEN', label: '🏢 Tingkat Cabang / Kab / Kota (Kwarcab)' },
+        { value: 'RANTING', label: '🏕️ Tingkat Ranting / Kecamatan (Kwarran)' }
+      ];
+    } else if (isProvinceAdmin) {
+      return [
+        { value: 'PROVINSI', label: '🏛️ Tingkat Daerah / Provinsi (Kwarda)' },
+        { value: 'KABUPATEN', label: '🏢 Tingkat Cabang / Kab / Kota (Kwarcab di Provinsi)' },
+        { value: 'RANTING', label: '🏕️ Tingkat Ranting / Kecamatan (Kwarran di Provinsi)' }
+      ];
+    } else if (isRegencyAdmin) {
+      return [
+        { value: 'KABUPATEN', label: '🏢 Tingkat Cabang / Kab / Kota (Kwarcab)' },
+        { value: 'RANTING', label: '🏕️ Tingkat Ranting / Kecamatan (Kwarran di Cabang)' }
+      ];
+    } else {
+      return [
+        { value: 'RANTING', label: '🏕️ Tingkat Ranting / Kecamatan (Kwarran)' }
+      ];
+    }
+  }, [isSuperAdmin, isProvinceAdmin, isRegencyAdmin]);
+
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState(CATEGORY_OPTIONS[0]);
-  const [organizerLevel, setOrganizerLevel] = useState<'NASIONAL' | 'PROVINSI' | 'KABUPATEN' | 'RANTING'>('NASIONAL');
+  const [organizerLevel, setOrganizerLevel] = useState<'INTERNASIONAL' | 'NASIONAL' | 'PROVINSI' | 'KABUPATEN' | 'RANTING'>('NASIONAL');
   const [organizerName, setOrganizerName] = useState('');
   
   const [provinceId, setProvinceId] = useState('32');
@@ -88,12 +125,25 @@ export const ActivityFormModal: React.FC<ActivityFormModalProps> = ({
   const [contactEmail, setContactEmail] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Sync initial activity or default state
+  // Available regencies for selected province
+  const availableRegencies = useMemo(() => {
+    return REGENCIES_DATA.filter(r => r.provinceId === provinceId);
+  }, [provinceId]);
+
+  // Sync initial activity or default state with strict territorial bounds
   useEffect(() => {
     if (initialActivity) {
       setTitle(initialActivity.title || '');
       setCategory(initialActivity.category || CATEGORY_OPTIONS[0]);
-      setOrganizerLevel(initialActivity.organizerLevel || 'NASIONAL');
+      
+      // Ensure level respects role
+      const initialLvl = initialActivity.organizerLevel || 'PROVINSI';
+      if (!isSuperAdmin && (initialLvl === 'NASIONAL' || initialLvl === 'INTERNASIONAL')) {
+        setOrganizerLevel(isProvinceAdmin ? 'PROVINSI' : 'KABUPATEN');
+      } else {
+        setOrganizerLevel(initialLvl);
+      }
+
       setOrganizerName(initialActivity.organizerName || '');
       setProvinceId(initialActivity.provinceId || '32');
       setProvinceName(initialActivity.provinceName || 'Jawa Barat');
@@ -114,19 +164,48 @@ export const ActivityFormModal: React.FC<ActivityFormModalProps> = ({
       setContactPhone(initialActivity.contactPhone || '');
       setContactEmail(initialActivity.contactEmail || '');
     } else {
-      // Default new form state based on current user
+      // Default new form state strictly scoped to current user role and territory
       setTitle('');
       setCategory(CATEGORY_OPTIONS[0]);
-      setOrganizerLevel(currentUser.role === 'SUPER_ADMIN' ? 'NASIONAL' : 'PROVINSI');
-      setOrganizerName(
-        currentUser.role === 'SUPER_ADMIN' 
-          ? 'Pimpinan Saka Pariwisata Kwartir Nasional' 
-          : `Pimpinan Saka Pariwisata ${currentUser.jurisdictionName || 'Kwartir Daerah'}`
-      );
-      setProvinceId('32');
-      setProvinceName('Jawa Barat');
-      setRegencyId('');
-      setRegencyName('');
+
+      if (isSuperAdmin) {
+        setOrganizerLevel('NASIONAL');
+        setOrganizerName('Pimpinan Saka Pariwisata Kwartir Nasional Gerakan Pramuka');
+        setProvinceId('32');
+        setProvinceName('Jawa Barat');
+        setRegencyId('');
+        setRegencyName('');
+      } else if (isProvinceAdmin) {
+        setOrganizerLevel('PROVINSI');
+        const userProvId = currentUser.jurisdictionId || '32';
+        setProvinceId(userProvId);
+        const pObj = provinces.find(p => p.id === userProvId);
+        const pName = pObj ? pObj.name : 'Jawa Barat';
+        setProvinceName(pName);
+        setOrganizerName(`Pimpinan Saka Pariwisata Kwarda ${pName}`);
+        setRegencyId('');
+        setRegencyName('');
+      } else if (isRegencyAdmin) {
+        setOrganizerLevel('KABUPATEN');
+        const userRegId = currentUser.jurisdictionId || '32.04';
+        const provCode = userRegId.split('.')[0] || '32';
+        setProvinceId(provCode);
+        const pObj = provinces.find(p => p.id === provCode);
+        setProvinceName(pObj ? pObj.name : 'Jawa Barat');
+        setRegencyId(userRegId);
+        const regObj = REGENCIES_DATA.find(r => r.id === userRegId);
+        const rName = regObj ? regObj.name : (currentUser.jurisdictionName?.replace('Kwarcab ', '') || 'Kabupaten Bandung');
+        setRegencyName(rName);
+        setOrganizerName(`Pimpinan Saka Pariwisata Kwarcab ${rName}`);
+      } else {
+        setOrganizerLevel('RANTING');
+        setProvinceId('32');
+        setProvinceName('Jawa Barat');
+        setRegencyId('32.04');
+        setRegencyName('Kabupaten Bandung');
+        setOrganizerName(`Pimpinan Saka Pariwisata ${currentUser.jurisdictionName || 'Kwarran'}`);
+      }
+
       setLocationName('');
       setLocationAddress('');
       setStartDate(new Date(Date.now() + 86400000 * 7).toISOString().split('T')[0]);
@@ -146,15 +225,30 @@ export const ActivityFormModal: React.FC<ActivityFormModalProps> = ({
       setContactPhone('081299881122');
       setContactEmail(currentUser.email);
     }
-  }, [initialActivity, isOpen, currentUser]);
+  }, [initialActivity, isOpen, currentUser, isSuperAdmin, isProvinceAdmin, isRegencyAdmin]);
 
   if (!isOpen) return null;
 
   const handleProvinceChange = (pId: string) => {
+    if (!isSuperAdmin) return; // Locked for operators
     setProvinceId(pId);
     const prov = provinces.find(p => p.id === pId);
     if (prov) {
       setProvinceName(prov.name);
+      // Reset regency when province changes
+      setRegencyId('');
+      setRegencyName('');
+    }
+  };
+
+  const handleRegencyChange = (rId: string) => {
+    if (isRegencyAdmin || isBranchAdmin) return; // Locked for regency/branch operators
+    setRegencyId(rId);
+    const reg = REGENCIES_DATA.find(r => r.id === rId);
+    if (reg) {
+      setRegencyName(reg.name);
+    } else {
+      setRegencyName('');
     }
   };
 
@@ -173,6 +267,12 @@ export const ActivityFormModal: React.FC<ActivityFormModalProps> = ({
     e.preventDefault();
     if (!title.trim() || !locationName.trim()) {
       alert('Mohon isi Judul Kegiatan dan Lokasi Kegiatan.');
+      return;
+    }
+
+    // Role-based validation guard
+    if (!isSuperAdmin && (organizerLevel === 'NASIONAL' || organizerLevel === 'INTERNASIONAL')) {
+      alert('Hanya Super Admin yang berwenang mendaftarkan kegiatan berskala Nasional atau Internasional.');
       return;
     }
 
@@ -231,14 +331,23 @@ export const ActivityFormModal: React.FC<ActivityFormModalProps> = ({
               <h2 className="text-lg sm:text-xl font-bold font-heading">
                 {initialActivity ? 'Edit Agenda Kegiatan Saka Pariwisata' : 'Unggah Agenda Kegiatan Baru'}
               </h2>
-              <p className="text-xs text-purple-200/80 mt-0.5">
-                Diupload resmi oleh {currentUser.name} ({currentUser.role === 'SUPER_ADMIN' ? 'Super Admin Kwarnas' : 'Operator Wilayah'})
-              </p>
+              <div className="flex items-center gap-2 mt-0.5">
+                <span className="text-xs text-purple-200">
+                  {currentUser.name}
+                </span>
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                  isSuperAdmin 
+                    ? 'bg-amber-400 text-amber-950' 
+                    : 'bg-emerald-400 text-emerald-950'
+                }`}>
+                  {isSuperAdmin ? 'Super Admin Kwarnas' : `Operator ${currentUser.jurisdictionName || 'Wilayah'}`}
+                </span>
+              </div>
             </div>
           </div>
           <button 
             onClick={onClose}
-            className="p-2 text-slate-300 hover:text-white rounded-full hover:bg-white/10 transition-colors"
+            className="p-2 text-slate-300 hover:text-white rounded-full hover:bg-white/10 transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -247,13 +356,32 @@ export const ActivityFormModal: React.FC<ActivityFormModalProps> = ({
         {/* Modal Form Content */}
         <form onSubmit={handleSubmit} className="p-5 sm:p-7 overflow-y-auto space-y-6 flex-1 custom-scrollbar">
           
-          {/* Disclaimer Etalase */}
-          <div className="bg-purple-50/80 border border-purple-200 rounded-2xl p-4 flex items-start gap-3">
-            <Info className="w-5 h-5 text-purple-700 flex-shrink-0 mt-0.5" />
-            <p className="text-xs text-purple-900 leading-relaxed">
-              Agenda yang diunggah akan otomatis tampil pada <strong>Galeri Agenda Kegiatan Saka Pariwisata</strong> di Beranda/Dashboard Publik & Anggota. Aplikasi ini berfungsi sebagai etalase informasi, calon peserta/wisatawan akan langsung menghubungi nomor kontak WhatsApp Anda.
-            </p>
-          </div>
+          {/* Role & Territorial Boundary Notice Banner */}
+          {isSuperAdmin ? (
+            <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-2xl p-4 flex items-start gap-3">
+              <Sparkles className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-xs font-bold text-amber-950">
+                  👑 Hak Akses Penuh Super Admin Kwartir Nasional
+                </p>
+                <p className="text-xs text-amber-900/90 mt-0.5 leading-relaxed">
+                  Anda berwenang mendaftarkan agenda kegiatan berskala <strong>Nasional</strong>, <strong>Internasional</strong>, maupun seluruh tingkatan Kwarda & Kwarcab di seluruh 38 provinsi Indonesia.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="bg-gradient-to-r from-sky-50 to-indigo-50 border border-sky-200 rounded-2xl p-4 flex items-start gap-3">
+              <Lock className="w-5 h-5 text-sky-700 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-xs font-bold text-sky-950">
+                  🔒 Batasan Hak Akses Teritorial Operator ({currentUser.jurisdictionName || 'Cabang'})
+                </p>
+                <p className="text-xs text-sky-900/90 mt-0.5 leading-relaxed">
+                  Sesuai ketentuan sistem, hanya <strong>Super Admin</strong> yang dapat mendaftarkan event berskala <strong>Nasional / Internasional</strong>. Anda hanya berwenang mendaftarkan agenda kegiatan dan event di wilayah cabang/yurisdiksi terdaftar Anda.
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* 1. Informasi Utama */}
           <div className="space-y-4">
@@ -288,16 +416,22 @@ export const ActivityFormModal: React.FC<ActivityFormModalProps> = ({
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700">Tingkat Penyelenggara</label>
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-slate-700">Tingkat / Skala Penyelenggara</label>
+                  {!isSuperAdmin && (
+                    <span className="text-[10px] text-sky-700 font-medium flex items-center gap-1">
+                      <Lock className="w-3 h-3" /> Wilayah Terkunci
+                    </span>
+                  )}
+                </div>
                 <select
                   value={organizerLevel}
                   onChange={(e) => setOrganizerLevel(e.target.value as any)}
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-900 focus:bg-white focus:ring-2 focus:ring-purple-500 focus:outline-none"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-900 focus:bg-white focus:ring-2 focus:ring-purple-500 focus:outline-none font-medium"
                 >
-                  <option value="NASIONAL">Tingkat Nasional (Kwarnas)</option>
-                  <option value="PROVINSI">Tingkat Provinsi (Kwarda)</option>
-                  <option value="KABUPATEN">Tingkat Kabupaten/Kota (Kwarcab)</option>
-                  <option value="RANTING">Tingkat Ranting (Kwarran)</option>
+                  {availableLevels.map((lvl) => (
+                    <option key={lvl.value} value={lvl.value}>{lvl.label}</option>
+                  ))}
                 </select>
               </div>
             </div>
@@ -395,26 +529,80 @@ export const ActivityFormModal: React.FC<ActivityFormModalProps> = ({
             </div>
           </div>
 
-          {/* 3. Lokasi & Wilayah */}
+          {/* 3. Lokasi & Wilayah Teritorial */}
           <div className="space-y-4 pt-4 border-t border-slate-100">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">
-              3. Lokasi & Wilayah
-            </h3>
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                3. Lokasi & Wilayah Teritorial Penyelenggaraan
+              </h3>
+              {!isSuperAdmin && (
+                <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200 flex items-center gap-1">
+                  <Lock className="w-3 h-3 text-emerald-600" />
+                  Yurisdiksi: {currentUser.jurisdictionName || 'Wilayah Operator'}
+                </span>
+              )}
+            </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Provinsi */}
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700">Provinsi Penyelenggaraan</label>
-                <select
-                  value={provinceId}
-                  onChange={(e) => handleProvinceChange(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-900 focus:bg-white focus:ring-2 focus:ring-purple-500 focus:outline-none"
-                >
-                  {provinces.map((prov) => (
-                    <option key={prov.id} value={prov.id}>{prov.name}</option>
-                  ))}
-                </select>
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-slate-700">Provinsi Penyelenggaraan</label>
+                  {!isSuperAdmin && (
+                    <span className="text-[10px] text-slate-500 font-medium flex items-center gap-0.5">
+                      <Lock className="w-2.5 h-2.5" /> Terkunci
+                    </span>
+                  )}
+                </div>
+                {isSuperAdmin ? (
+                  <select
+                    value={provinceId}
+                    onChange={(e) => handleProvinceChange(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-900 focus:bg-white focus:ring-2 focus:ring-purple-500 focus:outline-none"
+                  >
+                    {provinces.map((prov) => (
+                      <option key={prov.id} value={prov.id}>{prov.name}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <div className="w-full px-3.5 py-2.5 bg-slate-100 border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-700 font-medium flex items-center justify-between">
+                    <span>{provinceName}</span>
+                    <Lock className="w-3.5 h-3.5 text-slate-400" />
+                  </div>
+                )}
               </div>
 
+              {/* Kabupaten / Kota */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-slate-700">Kabupaten / Kota</label>
+                  {(isRegencyAdmin || isBranchAdmin) && (
+                    <span className="text-[10px] text-slate-500 font-medium flex items-center gap-0.5">
+                      <Lock className="w-2.5 h-2.5" /> Terkunci
+                    </span>
+                  )}
+                </div>
+                {(isRegencyAdmin || isBranchAdmin) ? (
+                  <div className="w-full px-3.5 py-2.5 bg-slate-100 border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-700 font-medium flex items-center justify-between">
+                    <span>{regencyName || 'Kabupaten Bandung'}</span>
+                    <Lock className="w-3.5 h-3.5 text-slate-400" />
+                  </div>
+                ) : (
+                  <select
+                    value={regencyId}
+                    onChange={(e) => handleRegencyChange(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-900 focus:bg-white focus:ring-2 focus:ring-purple-500 focus:outline-none"
+                  >
+                    <option value="">-- Seluruh Wilayah / Tingkat Provinsi --</option>
+                    {availableRegencies.map((reg) => (
+                      <option key={reg.id} value={reg.id}>{reg.name}</option>
+                    ))}
+                  </select>
+                )}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-slate-700">Nama Tempat / Kawasan Wisata *</label>
                 <input
@@ -426,17 +614,17 @@ export const ActivityFormModal: React.FC<ActivityFormModalProps> = ({
                   className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-900 focus:bg-white focus:ring-2 focus:ring-purple-500 focus:outline-none"
                 />
               </div>
-            </div>
 
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-slate-700">Alamat Lengkap / Keterangan Titik Kumpul</label>
-              <input
-                type="text"
-                value={locationAddress}
-                onChange={(e) => setLocationAddress(e.target.value)}
-                placeholder="Contoh: Kawasan Taman Nasional Bromo Tengger Semeru, Jawa Timur"
-                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:bg-white focus:ring-2 focus:ring-purple-500 focus:outline-none"
-              />
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700">Alamat Lengkap / Keterangan Titik Kumpul</label>
+                <input
+                  type="text"
+                  value={locationAddress}
+                  onChange={(e) => setLocationAddress(e.target.value)}
+                  placeholder="Contoh: Kawasan Bromo, Desa Ngadisari"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-900 focus:bg-white focus:ring-2 focus:ring-purple-500 focus:outline-none"
+                />
+              </div>
             </div>
           </div>
 
@@ -505,7 +693,7 @@ export const ActivityFormModal: React.FC<ActivityFormModalProps> = ({
                     <button
                       type="button"
                       onClick={() => handleRemoveRequirement(idx)}
-                      className="p-2 text-rose-500 hover:bg-rose-50 rounded-xl transition-colors"
+                      className="p-2 text-rose-500 hover:bg-rose-50 rounded-xl transition-colors cursor-pointer"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -576,7 +764,7 @@ export const ActivityFormModal: React.FC<ActivityFormModalProps> = ({
                   type="email"
                   value={contactEmail}
                   onChange={(e) => setContactEmail(e.target.value)}
-                  placeholder="kwarda.jabar@sakapariwisata.id"
+                  placeholder="panitia@sakapariwisata.id"
                   className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-900 focus:bg-white focus:ring-2 focus:ring-purple-500 focus:outline-none"
                 />
               </div>
