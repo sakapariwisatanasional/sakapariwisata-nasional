@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { Member, CurrentUser } from '../../types';
 import { storage } from '../../services/storage';
+import { spreadsheetService } from '../../services/spreadsheetService';
 import { SakaLogo } from '../common/SakaLogo';
 import { GOOGLE_DRIVE_MAIN_FOLDER, formatGoogleDriveUrl } from '../../services/driveRepository';
 
@@ -129,25 +130,31 @@ export const MemberPhotoEditModal: React.FC<MemberPhotoEditModalProps> = ({
     }
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!selectedPhoto) {
       alert('Silakan pilih atau unggah foto terlebih dahulu.');
       return;
     }
 
     setIsSaving(true);
-    setTimeout(() => {
-      const updated = storage.updateMemberPhoto(member.id, selectedPhoto, currentUser);
-      setIsSaving(false);
-      setSaveSuccess(true);
 
-      setTimeout(() => {
-        if (updated && onSuccess) {
-          onSuccess(updated);
-        }
-        onClose();
-      }, 700);
-    }, 400);
+    // Jika berupa base64 dan Google Apps Script aktif, kirim juga ke Drive
+    if (selectedPhoto.startsWith('data:image')) {
+      const cleanName = member.fullName.replace(/[^a-zA-Z0-9]/g, '_');
+      const filename = `KTA_${member.nationalMemberNumber || member.id}_${cleanName}.jpg`;
+      spreadsheetService.uploadImageToDrive(selectedPhoto, filename, 'MEMBER_AVATAR').catch(console.error);
+    }
+
+    const updated = storage.updateMemberPhoto(member.id, selectedPhoto, currentUser);
+    setIsSaving(false);
+    setSaveSuccess(true);
+
+    setTimeout(() => {
+      if (updated && onSuccess) {
+        onSuccess(updated);
+      }
+      onClose();
+    }, 600);
   };
 
   return (

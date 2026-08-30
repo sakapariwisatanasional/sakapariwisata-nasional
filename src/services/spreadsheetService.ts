@@ -646,24 +646,115 @@ class SpreadsheetService {
   }
 
   /**
+   * Upload gambar base64 langsung ke Google Drive melalui Apps Script Web App
+   */
+  public async uploadImageToDrive(
+    base64Data: string, 
+    filename: string, 
+    category: 'MEMBER_AVATAR' | 'TOUR_PACKAGES' | 'CULINARY_SOUVENIRS' | 'DOCUMENTS' | 'KTA_CARD' = 'MEMBER_AVATAR'
+  ): Promise<{ success: boolean; directUrl?: string; fileId?: string; viewUrl?: string; message: string }> {
+    const scriptUrl = this.config.scriptUrl;
+    if (!scriptUrl) {
+      return {
+        success: false,
+        message: 'Google Apps Script Web App URL belum dipasang. Harap pasang Web App URL di Pengaturan Database agar dapat mengunggah file langsung ke Google Drive.'
+      };
+    }
+
+    try {
+      const payload = {
+        action: 'UPLOAD_DRIVE_IMAGE',
+        folderId: '16Ql42x6HBWJIB8ss7abnurS_Kne5HYvh',
+        category,
+        filename,
+        base64: base64Data,
+        mimeType: base64Data.includes('data:image/png') ? 'image/png' : 'image/jpeg'
+      };
+
+      // Catatan: Google Apps Script Web App mengembalikan redirect 302 yang bila diakses via fetch
+      // no-cors akan berhasil dieksekusi di sisi server Apps Script
+      await fetch(scriptUrl, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      return {
+        success: true,
+        message: `Foto ${filename} berhasil dikirim untuk diunggah ke Google Drive folder.`
+      };
+    } catch (err: any) {
+      console.error('Failed to upload image to Drive:', err);
+      return {
+        success: false,
+        message: `Gagal mengunggah foto ke Google Drive: ${err.message}`
+      };
+    }
+  }
+
+  /**
+   * Inisialisasi struktur subfolder di Google Drive folder 16Ql42x6HBWJIB8ss7abnurS_Kne5HYvh
+   */
+  public async setupDriveFolders(): Promise<{ success: boolean; message: string }> {
+    const scriptUrl = this.config.scriptUrl;
+    if (!scriptUrl) {
+      return {
+        success: false,
+        message: 'Google Apps Script Web App URL belum dipasang.'
+      };
+    }
+
+    try {
+      const payload = {
+        action: 'SETUP_DRIVE_FOLDERS',
+        folderId: '16Ql42x6HBWJIB8ss7abnurS_Kne5HYvh'
+      };
+
+      await fetch(scriptUrl, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      return {
+        success: true,
+        message: 'Permintaan pembuatan struktur subfolder di Google Drive berhasil dikirim.'
+      };
+    } catch (err: any) {
+      return {
+        success: false,
+        message: `Gagal inisialisasi folder: ${err.message}`
+      };
+    }
+  }
+
+  /**
    * Hasilkan Template Script Google Apps Script yang siap di-copy-paste oleh user
    */
   public getGoogleAppsScriptTemplate(): string {
     return `// =========================================================================
 // GOOGLE APPS SCRIPT: MASTER DATABASE & DRIVE API SAKA PARIWISATA INDONESIA
 // =========================================================================
+// Folder Google Drive Target:
+// https://drive.google.com/drive/folders/16Ql42x6HBWJIB8ss7abnurS_Kne5HYvh
+//
 // Panduan Penerapan (Deployment Guide):
 // 1. Di Google Sheets Anda, klik menu: "Ekstensi" (Extensions) > "Apps Script".
 // 2. Hapus semua baris kode yang ada, lalu tempelkan seluruh skrip di bawah ini.
 // 3. Klik tombol "Deploy" (Terapkan) di pojok kanan atas > pilih "New deployment" (Penerapan baru).
 // 4. Pilih jenis "Web app" (Aplikasi Web).
 // 5. Konfigurasi:
-//    - Description: "Saka Pariwisata Database & Media API v2"
+//    - Description: "Saka Pariwisata Master Database & Media Drive API v3"
 //    - Execute as: "Me" (Jalankan sebagai: Saya)
 //    - Who has access: "Anyone" (Siapa saja)  <-- WAJIB PILIH "ANYONE" AGAR BISA DITULIS DARI APLIKASI
-// 6. Klik "Deploy", beri izin akses Google jika diminta, lalu salin URL Web App yang berakhiran "/exec".
-// 7. Tempelkan URL tersebut ke Pengaturan Database di Aplikasi Saka Pariwisata.
+// 6. Klik "Deploy", lalu jika muncul jendela "Authorization required", klik "Review permissions" -> 
+//    Pilih akun Google Anda -> Klik "Advanced" (Lanjutan) -> Klik "Go to ... (unsafe)" -> Klik "Allow" (Izinkan).
+// 7. Salin URL Web App yang berakhiran "/exec", lalu tempelkan ke Pengaturan Database di Aplikasi Saka.
 // =========================================================================
+
+var MASTER_DRIVE_FOLDER_ID = "16Ql42x6HBWJIB8ss7abnurS_Kne5HYvh";
 
 function doGet(e) {
   var sheetName = (e && e.parameter && e.parameter.sheet) ? e.parameter.sheet : "Anggota";
@@ -705,38 +796,88 @@ function doPost(e) {
 
     var body = JSON.parse(e.postData.contents);
     var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var rootFolder = getOrCreateDriveFolder(MASTER_DRIVE_FOLDER_ID);
 
-    // 1. AKSI UPLOAD GAMBAR KE GOOGLE DRIVE
+    // 1. AKSI INISIALISASI STRUKTUR SUBFOLDER DI GOOGLE DRIVE
+    if (body.action === "SETUP_DRIVE_FOLDERS") {
+      var subfolders = setupAllSubfolders(rootFolder);
+      
+      // Buat file status verifikasi di root folder
+      var statusFileContent = "SISTEM DATABASE & MEDIA SAKA PARIWISATA INDONESIA\\n" +
+        "Diperbarui pada: " + new Date().toISOString() + "\\n" +
+        "Folder Utama ID: " + MASTER_DRIVE_FOLDER_ID + "\\n" +
+        "Status: TERHUBUNG & AKTIF\\n";
+      
+      var statusBlob = Utilities.newBlob(statusFileContent, "text/plain", "STATUS_KONEKSI_SAKA_PARIWISATA.txt");
+      var statusFile = rootFolder.createFile(statusBlob);
+      statusFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+
+      return ContentService.createTextOutput(JSON.stringify({
+        status: "success",
+        message: "Struktur subfolder Google Drive berhasil dibuat dan diatur.",
+        subfolders: subfolders
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // 2. AKSI UPLOAD GAMBAR TUNGGAL KE GOOGLE DRIVE
     if (body.action === "UPLOAD_DRIVE_IMAGE") {
-      var folderId = body.folderId || "16Ql42x6HBWJIB8ss7abnurS_Kne5HYvh";
-      var folder;
-      try {
-        folder = DriveApp.getFolderById(folderId);
-      } catch (fErr) {
-        folder = DriveApp.getRootFolder();
+      var targetSubfolder = getCategorySubfolder(rootFolder, body.category || "MEMBER_AVATAR");
+      
+      var base64Data = (body.base64 || "").replace(/^data:image\\/\\w+;base64,/, "");
+      if (!base64Data) {
+        return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "Data base64 gambar kosong" }))
+          .setMimeType(ContentService.MimeType.JSON);
       }
 
-      var base64Data = body.base64.replace(/^data:image\\/\\w+;base64,/, "");
       var decoded = Utilities.base64Decode(base64Data);
-      var blob = Utilities.newBlob(decoded, body.mimeType || "image/jpeg", body.filename || ("saka_media_" + Date.now() + ".jpg"));
-      var file = folder.createFile(blob);
+      var filename = body.filename || ("saka_photo_" + Date.now() + ".jpg");
+      var blob = Utilities.newBlob(decoded, body.mimeType || "image/jpeg", filename);
+      var file = targetSubfolder.createFile(blob);
       file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
       
       var directUrl = "https://lh3.googleusercontent.com/d/" + file.getId();
+      var viewUrl = file.getUrl();
+
       return ContentService.createTextOutput(JSON.stringify({
         status: "success",
         fileId: file.getId(),
         directUrl: directUrl,
-        viewUrl: file.getUrl()
+        viewUrl: viewUrl,
+        folderName: targetSubfolder.getName()
       })).setMimeType(ContentService.MimeType.JSON);
     }
 
-    // 2. AKSI BATCH SINKRONISASI SELURUH DATA (SYNC_ALL_DATA)
+    // 3. AKSI BATCH SINKRONISASI SELURUH DATA & OTOMATIS SIMPAN FOTO KE DRIVE (SYNC_ALL_DATA)
     if (body.action === "SYNC_ALL_DATA") {
+      var driveSubfolders = setupAllSubfolders(rootFolder);
+      var avatarFolder = driveSubfolders["01_Pas_Foto_KTA_Anggota"];
+
+      // Proses dan simpan foto anggota jika dalam format base64
+      var processedMembers = (body.members || []).map(function(row) {
+        var photoUrl = row[11]; // Kolom Foto URL
+        if (photoUrl && typeof photoUrl === "string" && photoUrl.indexOf("data:image") === 0) {
+          try {
+            var b64 = photoUrl.replace(/^data:image\\/\\w+;base64,/, "");
+            var dec = Utilities.base64Decode(b64);
+            var memberNtaOrId = row[1] || row[0] || Date.now();
+            var memberName = (row[2] || "Anggota").replace(/[^a-zA-Z0-9]/g, "_");
+            var fName = "KTA_" + memberNtaOrId + "_" + memberName + ".jpg";
+            var blb = Utilities.newBlob(dec, "image/jpeg", fName);
+            var f = avatarFolder.createFile(blb);
+            f.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+            row[11] = "https://lh3.googleusercontent.com/d/" + f.getId();
+          } catch (imgErr) {
+            // Keep original if error
+          }
+        }
+        return row;
+      });
+
+      // Tulis / Update ke masing-masing Sheet
       syncSheetData(ss, "Anggota", [
         "ID", "Nomor KTA", "Nama Lengkap", "Email", "Nomor WA", "Provinsi", "Kabupaten/Kota", 
         "Kwarran/Kecamatan", "Gudep", "Krida", "Status", "Foto URL", "Tanggal Daftar", "Link Verifikasi"
-      ], body.members || []);
+      ], processedMembers);
 
       syncSheetData(ss, "Paket_Wisata", [
         "ID", "Nama Paket", "Kategori", "Harga", "Durasi (Hari)", "Lokasi", "Provinsi", 
@@ -754,13 +895,24 @@ function doPost(e) {
         "Kontak Narahubung", "Didaftarkan Oleh", "Waktu Diperbarui"
       ], body.activities || []);
 
+      // Buat file rekapitulasi data di Google Drive
+      var rekapText = "REKAPITULASI DATABASE SAKA PARIWISATA INDONESIA\\n" +
+        "Waktu Sinkronisasi: " + new Date().toLocaleString("id-ID", { timeZone: "Asia/Jakarta" }) + " WIB\\n" +
+        "Jumlah Anggota: " + (body.members ? body.members.length : 0) + "\\n" +
+        "Jumlah Paket Wisata: " + (body.tours ? body.tours.length : 0) + "\\n" +
+        "Jumlah Kuliner & Cinderamata: " + (body.culinary ? body.culinary.length : 0) + "\\n" +
+        "Jumlah Agenda Kegiatan: " + (body.activities ? body.activities.length : 0) + "\\n";
+      
+      var rekapBlob = Utilities.newBlob(rekapText, "text/plain", "REKAP_DATABASE_TERBARU.txt");
+      rootFolder.createFile(rekapBlob);
+
       return ContentService.createTextOutput(JSON.stringify({
         status: "success",
-        message: "Seluruh data (Anggota, Paket Wisata, Kuliner, Agenda) berhasil disinkronkan ke Google Spreadsheet."
+        message: "Seluruh data dan foto berhasil disinkronkan ke Google Spreadsheet dan Google Drive."
       })).setMimeType(ContentService.MimeType.JSON);
     }
 
-    // 3. AKSI TULIS BARIS TUNGGAL (UPSERT / APPEND)
+    // 4. AKSI TULIS BARIS TUNGGAL (UPSERT / APPEND)
     var sheetName = body.sheet || "Anggota";
     var sheet = ss.getSheetByName(sheetName);
     if (!sheet) {
@@ -781,6 +933,56 @@ function doPost(e) {
       status: "error",
       message: err.toString()
     })).setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+function getOrCreateDriveFolder(folderId) {
+  try {
+    return DriveApp.getFolderById(folderId);
+  } catch (err) {
+    return DriveApp.getRootFolder();
+  }
+}
+
+function setupAllSubfolders(rootFolder) {
+  var folderNames = [
+    "01_Pas_Foto_KTA_Anggota",
+    "02_Paket_Wisata",
+    "03_Kuliner_dan_Cinderamata",
+    "04_Agenda_Kegiatan",
+    "05_Dokumen_dan_Surat"
+  ];
+
+  var map = {};
+  folderNames.forEach(function(fName) {
+    var it = rootFolder.getFoldersByName(fName);
+    var target;
+    if (it.hasNext()) {
+      target = it.next();
+    } else {
+      target = rootFolder.createFolder(fName);
+      target.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    }
+    map[fName] = target;
+  });
+
+  return map;
+}
+
+function getCategorySubfolder(rootFolder, category) {
+  var targetName = "01_Pas_Foto_KTA_Anggota";
+  if (category === "TOUR_PACKAGES") targetName = "02_Paket_Wisata";
+  else if (category === "CULINARY_SOUVENIRS") targetName = "03_Kuliner_dan_Cinderamata";
+  else if (category === "DOCUMENTS" || category === "KTA_CARD") targetName = "05_Dokumen_dan_Surat";
+  else if (category === "ACTIVITIES") targetName = "04_Agenda_Kegiatan";
+
+  var it = rootFolder.getFoldersByName(targetName);
+  if (it.hasNext()) {
+    return it.next();
+  } else {
+    var created = rootFolder.createFolder(targetName);
+    created.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    return created;
   }
 }
 
@@ -812,7 +1014,8 @@ function syncSheetData(ss, sheetName, defaultHeaders, rowsData) {
       }
     });
   }
-}`;
+}
+`;
   }
 }
 

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { 
   X, 
   FolderOpen, 
@@ -13,9 +13,14 @@ import {
   Sparkles,
   Link as LinkIcon,
   HelpCircle,
-  FileCheck
+  FileCheck,
+  Upload,
+  RotateCw,
+  AlertCircle,
+  CheckCircle2
 } from 'lucide-react';
 import { GOOGLE_DRIVE_MAIN_FOLDER, formatGoogleDriveUrl } from '../../services/driveRepository';
+import { spreadsheetService } from '../../services/spreadsheetService';
 
 interface DriveMediaRepositoryModalProps {
   isOpen: boolean;
@@ -35,6 +40,13 @@ export const DriveMediaRepositoryModal: React.FC<DriveMediaRepositoryModalProps>
   const [inputDriveUrl, setInputDriveUrl] = useState('');
   const [previewUrl, setPreviewUrl] = useState('');
   const [convertedDirectUrl, setConvertedDirectUrl] = useState('');
+  
+  // Direct Drive Upload States
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadBase64, setUploadBase64] = useState<string>('');
+  const [isUploadingToDrive, setIsUploadingToDrive] = useState(false);
+  const [uploadResult, setUploadResult] = useState<{ success: boolean; message: string; directUrl?: string } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   if (!isOpen) return null;
 
@@ -51,10 +63,70 @@ export const DriveMediaRepositoryModal: React.FC<DriveMediaRepositoryModalProps>
     setPreviewUrl(direct);
   };
 
-  const handleApplyUrl = () => {
-    if (onSelectImageUrl && convertedDirectUrl) {
-      onSelectImageUrl(convertedDirectUrl);
+  const handleApplyUrl = (urlToApply?: string) => {
+    const url = urlToApply || convertedDirectUrl;
+    if (onSelectImageUrl && url) {
+      onSelectImageUrl(url);
       onClose();
+    }
+  };
+
+  const handleFileSelect = (file: File) => {
+    if (!file.type.startsWith('image/')) {
+      alert('Silakan pilih file gambar (JPG, PNG, WEBP)');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      alert('Ukuran file maksimal 5MB');
+      return;
+    }
+
+    setUploadFile(file);
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      if (e.target?.result) {
+        setUploadBase64(e.target.result as string);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleUploadDirectToDrive = async () => {
+    if (!uploadBase64 || !uploadFile) {
+      alert('Silakan pilih berkas foto terlebih dahulu.');
+      return;
+    }
+
+    const config = spreadsheetService.getConfig();
+    if (!config.scriptUrl) {
+      setUploadResult({
+        success: false,
+        message: 'Google Apps Script Web App URL belum dipasang. Silakan pasang Web App URL di Pengaturan Database agar dapat mengunggah file langsung ke folder Drive.'
+      });
+      return;
+    }
+
+    setIsUploadingToDrive(true);
+    setUploadResult(null);
+
+    const categoryKey = (activeCategory === 'ICONS_LOGOS' ? 'DOCUMENTS' : activeCategory) as any;
+    const res = await spreadsheetService.uploadImageToDrive(uploadBase64, uploadFile.name, categoryKey);
+    setIsUploadingToDrive(false);
+
+    if (res.success) {
+      const generatedDirectUrl = res.directUrl || uploadBase64;
+      setUploadResult({
+        success: true,
+        message: `Foto ${uploadFile.name} berhasil dikirim ke Google Drive folder.`,
+        directUrl: generatedDirectUrl
+      });
+      setConvertedDirectUrl(generatedDirectUrl);
+      setPreviewUrl(generatedDirectUrl);
+    } else {
+      setUploadResult({
+        success: false,
+        message: res.message
+      });
     }
   };
 
@@ -140,6 +212,102 @@ export const DriveMediaRepositoryModal: React.FC<DriveMediaRepositoryModalProps>
                 <span>Buka Drive</span>
               </a>
             </div>
+          </div>
+
+          {/* Direct File Upload to Google Drive */}
+          <div className="p-4 bg-gradient-to-br from-indigo-50/60 to-purple-50/60 rounded-2xl border border-indigo-200/80 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Upload className="w-4 h-4 text-indigo-700" />
+                <h3 className="text-xs font-bold text-slate-900">
+                  Unggah Foto Langsung ke Google Drive
+                </h3>
+              </div>
+              <span className="text-[10px] bg-indigo-100 text-indigo-800 font-bold px-2 py-0.5 rounded">
+                Target Folder: {activeCategory}
+              </span>
+            </div>
+
+            <div 
+              onClick={() => fileInputRef.current?.click()}
+              className="border-2 border-dashed border-indigo-300 hover:border-indigo-500 bg-white/80 p-4 rounded-xl text-center cursor-pointer transition-all"
+            >
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  if (e.target.files && e.target.files[0]) {
+                    handleFileSelect(e.target.files[0]);
+                  }
+                }}
+              />
+              {uploadBase64 ? (
+                <div className="flex items-center justify-center gap-3">
+                  <img src={uploadBase64} alt="Preview Upload" className="w-12 h-12 rounded-lg object-cover border border-indigo-200" />
+                  <div className="text-left">
+                    <p className="text-xs font-bold text-slate-800">{uploadFile?.name}</p>
+                    <p className="text-[10px] text-slate-500">{((uploadFile?.size || 0) / 1024).toFixed(1)} KB - Siap diunggah</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  <Upload className="w-5 h-5 text-indigo-600 mx-auto" />
+                  <p className="text-xs font-bold text-slate-800">Pilih berkas foto untuk diunggah ke Google Drive</p>
+                  <p className="text-[10px] text-slate-400">JPG, PNG, WEBP (Maks 5MB)</p>
+                </div>
+              )}
+            </div>
+
+            {uploadFile && (
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={handleUploadDirectToDrive}
+                  disabled={isUploadingToDrive}
+                  className="px-4 py-2 bg-indigo-700 hover:bg-indigo-600 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  {isUploadingToDrive ? (
+                    <>
+                      <RotateCw className="w-3.5 h-3.5 animate-spin" />
+                      <span>Mengunggah ke Drive...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="w-3.5 h-3.5" />
+                      <span>Unggah ke Folder Drive</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
+
+            {uploadResult && (
+              <div className={`p-3 rounded-xl text-xs flex items-center gap-2 border ${
+                uploadResult.success 
+                  ? 'bg-emerald-50 border-emerald-200 text-emerald-800' 
+                  : 'bg-amber-50 border-amber-200 text-amber-800'
+              }`}>
+                {uploadResult.success ? (
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                ) : (
+                  <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0" />
+                )}
+                <div className="flex-1">
+                  <p>{uploadResult.message}</p>
+                </div>
+                {uploadResult.directUrl && onSelectImageUrl && (
+                  <button
+                    type="button"
+                    onClick={() => handleApplyUrl(uploadResult.directUrl)}
+                    className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold"
+                  >
+                    Gunakan
+                  </button>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Categories Grid */}
@@ -242,7 +410,7 @@ export const DriveMediaRepositoryModal: React.FC<DriveMediaRepositoryModalProps>
                 {onSelectImageUrl && (
                   <button
                     type="button"
-                    onClick={handleApplyUrl}
+                    onClick={() => handleApplyUrl()}
                     className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-xs transition-colors cursor-pointer"
                   >
                     Gunakan Gambar

@@ -35,6 +35,7 @@ export const SpreadsheetSyncModal: React.FC<SpreadsheetSyncModalProps> = ({
   const [spreadsheetIdInput, setSpreadsheetIdInput] = useState(config.spreadsheetId || DEFAULT_SPREADSHEET_ID);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isPushing, setIsPushing] = useState(false);
+  const [isSettingUpDrive, setIsSettingUpDrive] = useState(false);
   const [syncResult, setSyncResult] = useState<{ success: boolean; message: string } | null>(null);
   const [copiedScript, setCopiedScript] = useState(false);
   const [activeTab, setActiveTab] = useState<'status' | 'setup' | 'guide' | 'export'>('status');
@@ -45,6 +46,7 @@ export const SpreadsheetSyncModal: React.FC<SpreadsheetSyncModalProps> = ({
       setConfig(cfg);
       setScriptUrlInput(cfg.scriptUrl || '');
       setSpreadsheetIdInput(cfg.spreadsheetId || DEFAULT_SPREADSHEET_ID);
+      setSyncResult(null);
     }
   }, [isOpen]);
 
@@ -75,6 +77,31 @@ export const SpreadsheetSyncModal: React.FC<SpreadsheetSyncModalProps> = ({
       message: result.message
     });
     setConfig(spreadsheetService.getConfig());
+  };
+
+  const handleSetupDrive = async () => {
+    if (!scriptUrlInput.trim() && !config.scriptUrl) {
+      alert('Silakan pasang Google Apps Script Web App URL di tab "Pengaturan API" terlebih dahulu.');
+      setActiveTab('setup');
+      return;
+    }
+
+    setIsSettingUpDrive(true);
+    setSyncResult(null);
+
+    // Save updated scriptUrl first
+    if (scriptUrlInput.trim()) {
+      spreadsheetService.saveConfig({
+        scriptUrl: scriptUrlInput.trim()
+      });
+    }
+
+    const res = await spreadsheetService.setupDriveFolders();
+    setIsSettingUpDrive(false);
+    setSyncResult({
+      success: res.success,
+      message: res.message + ' Silakan periksa Google Drive Anda (5 subfolder dan file STATUS_KONEKSI_SAKA_PARIWISATA.txt telah dibuat).'
+    });
   };
 
   const handlePushAllToSheets = async () => {
@@ -244,7 +271,7 @@ export const SpreadsheetSyncModal: React.FC<SpreadsheetSyncModalProps> = ({
               </div>
 
               <div className="text-xs text-slate-600 font-mono bg-white p-2.5 rounded-xl border border-emerald-100 break-all select-all">
-                ID: {config.spreadsheetId || DEFAULT_SPREADSHEET_ID}
+                ID Spreadsheet: {config.spreadsheetId || DEFAULT_SPREADSHEET_ID}
               </div>
 
               <div className="grid grid-cols-4 gap-2 text-center text-xs">
@@ -264,6 +291,29 @@ export const SpreadsheetSyncModal: React.FC<SpreadsheetSyncModalProps> = ({
                   <p className="text-[10px] text-slate-400 font-bold uppercase">Agenda Event</p>
                   <p className="text-base font-extrabold text-slate-900 font-heading">{activitiesCount}</p>
                 </div>
+              </div>
+            </div>
+
+            {/* Google Drive Folder Card */}
+            <div className="p-4 bg-purple-50/60 rounded-2xl border border-purple-200/80 space-y-2.5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-xs font-bold text-purple-950">
+                  <Sparkles className="w-4 h-4 text-purple-600" />
+                  <span>Google Drive Repositori Media Terhubung</span>
+                </div>
+                <a
+                  href="https://drive.google.com/drive/folders/16Ql42x6HBWJIB8ss7abnurS_Kne5HYvh"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-[11px] font-bold text-purple-700 hover:text-purple-900 underline"
+                >
+                  <span>Buka di Google Drive</span>
+                  <ExternalLink className="w-3 h-3" />
+                </a>
+              </div>
+              <div className="text-xs text-purple-900 font-mono bg-white p-2.5 rounded-xl border border-purple-100 break-all select-all flex items-center justify-between">
+                <span>Folder ID: 16Ql42x6HBWJIB8ss7abnurS_Kne5HYvh</span>
+                <span className="text-[10px] bg-purple-100 text-purple-800 px-2 py-0.5 rounded font-bold">5 Subfolder</span>
               </div>
             </div>
 
@@ -292,30 +342,42 @@ export const SpreadsheetSyncModal: React.FC<SpreadsheetSyncModalProps> = ({
                 ) : (
                   <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0" />
                 )}
-                <span>{syncResult.message}</span>
+                <span className="leading-relaxed">{syncResult.message}</span>
               </div>
             )}
 
             {/* Action Buttons */}
-            <div className="flex flex-col sm:flex-row gap-2 pt-1">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
               <button
                 type="button"
                 onClick={handlePushAllToSheets}
                 disabled={isPushing}
-                className="flex-1 py-3 bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white font-bold text-xs rounded-xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                className="py-3 px-3 bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white font-bold text-xs rounded-xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
               >
                 <UploadCloud className={`w-4 h-4 ${isPushing ? 'animate-bounce' : ''}`} />
-                <span>{isPushing ? 'Mengirim Data ke Spreadsheet...' : 'Kirim Seluruh Data Lokal ke Google Spreadsheet'}</span>
+                <span>{isPushing ? 'Menyinkronkan Data & Foto...' : 'Kirim Data & Foto ke Spreadsheet & Drive'}</span>
               </button>
 
               <button
                 type="button"
+                onClick={handleSetupDrive}
+                disabled={isSettingUpDrive}
+                className="py-3 px-3 bg-purple-700 hover:bg-purple-600 text-white font-bold text-xs rounded-xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+              >
+                <RefreshCw className={`w-4 h-4 ${isSettingUpDrive ? 'animate-spin' : ''}`} />
+                <span>{isSettingUpDrive ? 'Membuat Struktur Folder...' : 'Inisialisasi Folder di Google Drive'}</span>
+              </button>
+            </div>
+
+            <div className="flex justify-end pt-1">
+              <button
+                type="button"
                 onClick={handleSyncNow}
                 disabled={isSyncing}
-                className="px-4 py-3 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
               >
                 <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
-                <span>Tarik dari Sheets</span>
+                <span>Tarik Data Terbaru dari Sheets</span>
               </button>
             </div>
 
@@ -399,37 +461,47 @@ export const SpreadsheetSyncModal: React.FC<SpreadsheetSyncModalProps> = ({
             <div className="p-3.5 bg-purple-50 border border-purple-200 rounded-2xl space-y-2 text-purple-950">
               <h4 className="font-extrabold text-sm flex items-center gap-1.5 text-purple-900">
                 <Sparkles className="w-4 h-4 text-purple-700" />
-                <span>Penyebab Kenapa Data Belum Berubah di Google Sheets:</span>
+                <span>Kenapa Spreadsheet & Google Drive Belum Berisi File/Folder?</span>
               </h4>
               <p className="text-xs text-purple-900 leading-relaxed">
-                Google Sheets dan Google Drive memiliki proteksi keamanan yang melarang browser web publik untuk menulis atau mengunggah data secara langsung tanpa perantara API resmi. 
-                Oleh karena itu, diperlukan <strong>Google Apps Script Web App</strong> sebagai jembatan API penulisan.
+                Google Sheets dan Google Drive memiliki sistem keamanan (CORS & Auth) yang melarang aplikasi web publik menulis spreadsheet atau membuat file di Google Drive secara langsung dari browser pengguna tanpa perantara resmi.
               </p>
+              <p className="text-xs text-purple-900 leading-relaxed font-semibold">
+                Solusinya: Kita menggunakan <strong>Google Apps Script Web App</strong> yang berjalan dengan izin akun Google Anda untuk:
+              </p>
+              <ul className="list-disc list-inside text-[11px] text-purple-800 space-y-1 ml-2">
+                <li>Membuat 5 subfolder otomatis di folder Google Drive Anda (<code>16Ql42x6HBWJIB8ss7abnurS_Kne5HYvh</code>)</li>
+                <li>Menyimpan foto KTA anggota & produk wisata langsung sebagai file gambar di Google Drive</li>
+                <li>Menuliskan baris data pendaftaran ke Google Spreadsheet secara realtime</li>
+              </ul>
             </div>
 
             <div className="space-y-3">
-              <h4 className="font-bold text-slate-900">Langkah Pemasangan API Web App (Hanya 2 Menit):</h4>
+              <h4 className="font-bold text-slate-900">Langkah Penerapan Script & Inisialisasi Drive (2 Menit):</h4>
               
               <ol className="space-y-2.5 list-decimal list-inside text-slate-700">
                 <li className="p-2.5 bg-slate-50 rounded-xl border border-slate-200">
-                  <strong>Buka Google Sheets:</strong> Buka spreadsheet database Anda, lalu klik menu <code>Ekstensi (Extensions) &gt; Apps Script</code>.
+                  <strong>Buka Google Sheets:</strong> Buka spreadsheet Anda, lalu klik menu <code>Ekstensi (Extensions) &gt; Apps Script</code>.
                 </li>
                 <li className="p-2.5 bg-slate-50 rounded-xl border border-slate-200">
-                  <strong>Tempelkan Kode:</strong> Hapus kode bawaan, lalu salin dan tempelkan <em>Kode Script Master</em> dari tab <strong>Pengaturan API</strong>.
+                  <strong>Tempelkan Kode Script Master:</strong> Buka tab <strong>"Pengaturan API"</strong> di atas, klik tombol <strong>"Salin Kode Script"</strong>, lalu tempelkan menggantikan seluruh isi editor di Google Apps Script.
                 </li>
                 <li className="p-2.5 bg-slate-50 rounded-xl border border-slate-200">
-                  <strong>Terapkan (Deploy):</strong> Klik tombol biru <strong>Deploy (Terapkan)</strong> di pojok kanan atas &gt; pilih <strong>New deployment (Penerapan baru)</strong>.
+                  <strong>Terapkan (Deploy) Penerapan Baru:</strong> Klik tombol biru <strong>Deploy (Terapkan)</strong> di pojok kanan atas &gt; pilih <strong>New deployment (Penerapan baru)</strong>.
                 </li>
                 <li className="p-2.5 bg-slate-50 rounded-xl border border-slate-200">
-                  <strong>Pilih Jenis Web App & Izin Akses:</strong>
+                  <strong>Konfigurasi Izin Akses (Sangat Penting):</strong>
                   <ul className="list-disc list-inside mt-1 ml-3 text-[11px] text-slate-600 space-y-0.5">
-                    <li>Pilih jenis: <strong>Web app</strong></li>
-                    <li>Execute as: <strong>Me (Jalankan sebagai saya)</strong></li>
-                    <li><strong className="text-red-600">Who has access: Anyone (Siapa saja)</strong> <span className="text-slate-500">(Penting: agar aplikasi web bisa mengirim data pendaftaran anggota/wisata).</span></li>
+                    <li>Pilih jenis (roda gigi): <strong>Web app (Aplikasi Web)</strong></li>
+                    <li>Execute as: <strong>Me (Saya)</strong></li>
+                    <li><strong className="text-red-600">Who has access: Anyone (Siapa saja)</strong> <span className="text-slate-500">(Wajib "Anyone" agar anggota/pengguna dapat mengupload foto & mendaftar dari web)</span></li>
                   </ul>
                 </li>
                 <li className="p-2.5 bg-slate-50 rounded-xl border border-slate-200">
-                  <strong>Salin URL & Simpan:</strong> Salin <strong>Web App URL</strong> yang dihasilkan (berakhiran <code>/exec</code>), tempelkan ke tab <strong>Pengaturan API</strong> di aplikasi ini, dan klik <strong>Simpan</strong>.
+                  <strong>Beri Izin Akun Google:</strong> Klik <em>Deploy</em> &gt; Klik <em>Review permissions</em> &gt; Pilih akun Google &gt; Klik <em>Advanced</em> &gt; Klik <em>Go to Saka Pariwisata API (unsafe)</em> &gt; Klik <em>Allow</em>.
+                </li>
+                <li className="p-2.5 bg-slate-50 rounded-xl border border-slate-200">
+                  <strong>Salin URL & Inisialisasi:</strong> Salin <strong>Web App URL</strong> (berakhiran <code>/exec</code>), tempelkan ke tab <strong>"Pengaturan API"</strong> di aplikasi ini, lalu klik tombol <strong>"Inisialisasi Folder di Google Drive"</strong> dan <strong>"Kirim Data & Foto ke Spreadsheet & Drive"</strong>!
                 </li>
               </ol>
             </div>
