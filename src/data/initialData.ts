@@ -77,7 +77,7 @@ export const INITIAL_ACTIVITIES: Activity[] = SHOWCASE_ACTIVITIES;
 // Database Riwayat Audit Log (Kosong)
 export const INITIAL_AUDIT_LOGS: AuditLog[] = [];
 
-// Akun Utama Aplikasi: Super Admin Rohadi Wijaya
+// Akun Pengguna Multi-Role (Super Admin, Operator Provinsi, Operator Kab/Kota, Operator Ranting, Anggota, Publik)
 export const DEMO_USERS: CurrentUser[] = [
   {
     id: 'user-superadmin-rohadi',
@@ -88,6 +88,59 @@ export const DEMO_USERS: CurrentUser[] = [
     role: 'SUPER_ADMIN',
     jurisdictionName: 'Kwartir Nasional (Semua Wilayah)',
     avatarUrl: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80'
+  },
+  {
+    id: 'user-kwarda-jabar',
+    username: 'kwardajabar',
+    password: 'kwardajabar',
+    email: 'kwarda.jabar@sakapariwisata.id',
+    name: 'Kak Hendra (Kwarda Jawa Barat)',
+    role: 'ADMIN_PROVINCE',
+    jurisdictionName: 'Kwarda Jawa Barat',
+    jurisdictionId: '32',
+    avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80'
+  },
+  {
+    id: 'user-kwarcab-bandung',
+    username: 'kwarcabbandung',
+    password: 'kwarcabbandung',
+    email: 'kwarcab.bandung@sakapariwisata.id',
+    name: 'Kak Asep (Kwarcab Kab. Bandung)',
+    role: 'ADMIN_REGENCY',
+    jurisdictionName: 'Kwarcab Kabupaten Bandung',
+    jurisdictionId: '32.04',
+    avatarUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80'
+  },
+  {
+    id: 'user-kwarran-ciwidey',
+    username: 'kwarranciwidey',
+    password: 'kwarranciwidey',
+    email: 'kwarran.ciwidey@sakapariwisata.id',
+    name: 'Kak Deden (Kwarran Ciwidey)',
+    role: 'ADMIN_BRANCH',
+    jurisdictionName: 'Kwarran Ciwidey',
+    jurisdictionId: 'br-ciwidey-01',
+    avatarUrl: 'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=150&auto=format&fit=crop&q=80'
+  },
+  {
+    id: 'user-mem-siti',
+    username: 'sitinurhaliza',
+    password: 'sitinurhaliza',
+    email: 'siti.nurhaliza@sakapariwisata.id',
+    name: 'Siti Nurhaliza, S.Tr.Par',
+    role: 'MEMBER',
+    jurisdictionName: 'Anggota Krida Penyuluh (Kab. Bandung)',
+    memberId: 'mem-jabar-02',
+    avatarUrl: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&auto=format&fit=crop&q=80'
+  },
+  {
+    id: 'user-public-guest',
+    username: 'wisatawan',
+    email: 'wisatawan@nusantara.id',
+    name: 'Wisatawan / Pengunjung Publik',
+    role: 'PUBLIC',
+    jurisdictionName: 'Pengunjung Umum',
+    avatarUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80'
   }
 ];
 

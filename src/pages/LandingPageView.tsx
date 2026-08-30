@@ -45,8 +45,6 @@ interface LandingPageViewProps {
   onOpenVerifyModal: (member: Member) => void;
   onViewTourDetail: (tour: TourPackage) => void;
   onSelectCulinaryDetail: (item: CulinarySouvenirItem) => void;
-  onOpenSpreadsheetModal: () => void;
-  onOpenDriveModal?: () => void;
   onEnterDashboard: (tab?: string) => void;
 }
 
@@ -60,8 +58,6 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
   onOpenVerifyModal,
   onViewTourDetail,
   onSelectCulinaryDetail,
-  onOpenSpreadsheetModal,
-  onOpenDriveModal,
   onEnterDashboard
 }) => {
   const [quickVerifyTerm, setQuickVerifyTerm] = useState('');
@@ -151,28 +147,6 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
 
         {/* Action Controls */}
         <div className="flex items-center gap-2 sm:gap-3">
-          {onOpenDriveModal && (
-            <button
-              type="button"
-              onClick={onOpenDriveModal}
-              className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 bg-purple-950/80 hover:bg-purple-900/90 text-purple-300 border border-purple-700/60 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs"
-              title="Google Drive Repository Aset & Gambar"
-            >
-              <FolderOpen className="w-3.5 h-3.5 text-purple-400" />
-              <span>Media Drive</span>
-            </button>
-          )}
-
-          <button
-            type="button"
-            onClick={onOpenSpreadsheetModal}
-            className="hidden md:flex items-center gap-1.5 px-3 py-1.5 bg-emerald-950/80 hover:bg-emerald-900/90 text-emerald-300 border border-emerald-700/60 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs"
-            title="Database Google Spreadsheet Terhubung"
-          >
-            <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Database Spreadsheet</span>
-          </button>
-
           <button
             type="button"
             onClick={onOpenLoginModal}
@@ -686,26 +660,6 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
           </div>
 
           <div className="flex items-center gap-4 flex-wrap justify-center">
-            {onOpenDriveModal && (
-              <>
-                <button
-                  onClick={onOpenDriveModal}
-                  className="inline-flex items-center gap-1.5 text-purple-400 hover:text-purple-300 cursor-pointer font-semibold"
-                >
-                  <FolderOpen className="w-3.5 h-3.5" />
-                  <span>Media Google Drive</span>
-                </button>
-                <span className="text-slate-700">|</span>
-              </>
-            )}
-            <button
-              onClick={onOpenSpreadsheetModal}
-              className="inline-flex items-center gap-1.5 text-emerald-400 hover:text-emerald-300 cursor-pointer font-semibold"
-            >
-              <FileSpreadsheet className="w-3.5 h-3.5" />
-              <span>Database Google Spreadsheet</span>
-            </button>
-            <span className="text-slate-700">|</span>
             <button
               onClick={() => onEnterDashboard('dashboard')}
               className="hover:text-white transition-colors cursor-pointer"

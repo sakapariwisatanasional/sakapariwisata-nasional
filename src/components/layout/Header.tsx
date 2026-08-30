@@ -54,6 +54,8 @@ export const Header: React.FC<HeaderProps> = ({
   const [showMobileSearch, setShowMobileSearch] = useState(false);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [availableUsers, setAvailableUsers] = useState<CurrentUser[]>([]);
+  const isSuperAdmin = currentUser.role === 'SUPER_ADMIN';
+  const isAdmin = ['SUPER_ADMIN', 'ADMIN_PROVINCE', 'ADMIN_REGENCY', 'ADMIN_BRANCH'].includes(currentUser.role);
 
   useEffect(() => {
     const update = () => {
@@ -156,12 +158,12 @@ export const Header: React.FC<HeaderProps> = ({
           <span>Landing Page</span>
         </button>
 
-        {/* Tombol Google Spreadsheet */}
-        {onOpenSpreadsheetModal && (
+        {/* Tombol Google Spreadsheet (HANYA SUPER ADMIN KWARTIR NASIONAL) */}
+        {isSuperAdmin && onOpenSpreadsheetModal && (
           <button
             onClick={onOpenSpreadsheetModal}
             className="hidden sm:flex items-center gap-1.5 px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs"
-            title="Database Google Spreadsheet Terhubung"
+            title="Database Google Spreadsheet Terhubung (Super Admin)"
           >
             <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
             <span className="hidden xl:inline">Google Spreadsheet</span>
@@ -169,12 +171,12 @@ export const Header: React.FC<HeaderProps> = ({
           </button>
         )}
 
-        {/* Tombol Google Drive Repository */}
-        {onOpenDriveModal && (
+        {/* Tombol Google Drive Repository (HANYA SUPER ADMIN KWARTIR NASIONAL) */}
+        {isSuperAdmin && onOpenDriveModal && (
           <button
             onClick={onOpenDriveModal}
             className="hidden md:flex items-center gap-1.5 px-3 py-2 bg-purple-50 hover:bg-purple-100 text-purple-900 border border-purple-300 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs"
-            title="Google Drive Repository Aset & Gambar"
+            title="Google Drive Repository Aset & Gambar (Super Admin)"
           >
             <FolderOpen className="w-3.5 h-3.5 text-purple-600" />
             <span className="hidden xl:inline">Google Drive</span>

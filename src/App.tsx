@@ -177,6 +177,18 @@ export default function App() {
     setIsAuthModalOpen(true);
   };
 
+  const handleOpenSpreadsheet = () => {
+    if (currentUser.role === 'SUPER_ADMIN') {
+      setIsSpreadsheetModalOpen(true);
+    }
+  };
+
+  const handleOpenDrive = () => {
+    if (currentUser.role === 'SUPER_ADMIN') {
+      setIsDriveModalOpen(true);
+    }
+  };
+
   // IF CURRENT TAB IS LANDING PAGE
   if (currentTab === 'landing') {
     return (
@@ -191,8 +203,6 @@ export default function App() {
           onOpenVerifyModal={(m) => setVerifyingMember(m)}
           onViewTourDetail={(t) => setSelectedTourDetail(t)}
           onSelectCulinaryDetail={(item) => setSelectedCulinaryDetail(item)}
-          onOpenSpreadsheetModal={() => setIsSpreadsheetModalOpen(true)}
-          onOpenDriveModal={() => setIsDriveModalOpen(true)}
           onEnterDashboard={(tab) => setCurrentTab(tab || 'dashboard')}
         />
 
@@ -210,11 +220,6 @@ export default function App() {
               setCurrentTab('dashboard');
             }
           }}
-        />
-
-        <SpreadsheetSyncModal
-          isOpen={isSpreadsheetModalOpen}
-          onClose={() => setIsSpreadsheetModalOpen(false)}
         />
 
         <MemberVerificationModal
@@ -258,8 +263,8 @@ export default function App() {
         onOpenPublicPortal={() => setCurrentTab('verify-portal')}
         isOpenMobile={isMobileMenuOpen}
         onCloseMobile={() => setIsMobileMenuOpen(false)}
-        onOpenSpreadsheetModal={() => setIsSpreadsheetModalOpen(true)}
-        onOpenDriveModal={() => setIsDriveModalOpen(true)}
+        onOpenSpreadsheetModal={currentUser.role === 'SUPER_ADMIN' ? handleOpenSpreadsheet : undefined}
+        onOpenDriveModal={currentUser.role === 'SUPER_ADMIN' ? handleOpenDrive : undefined}
       />
 
       {/* Main Content Area */}
@@ -279,8 +284,8 @@ export default function App() {
           onOpenRegisterModal={() => handleOpenAuth('register')}
           onSelectTab={setCurrentTab}
           onToggleMobileMenu={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-          onOpenSpreadsheetModal={() => setIsSpreadsheetModalOpen(true)}
-          onOpenDriveModal={() => setIsDriveModalOpen(true)}
+          onOpenSpreadsheetModal={currentUser.role === 'SUPER_ADMIN' ? handleOpenSpreadsheet : undefined}
+          onOpenDriveModal={currentUser.role === 'SUPER_ADMIN' ? handleOpenDrive : undefined}
           onOpenLoginModal={() => handleOpenAuth('login')}
         />
 
@@ -305,6 +310,8 @@ export default function App() {
                   setIsCulinaryFormOpen(true);
                 }}
                 onSelectCulinaryDetail={(item) => setSelectedCulinaryDetail(item)}
+                onOpenSpreadsheetModal={currentUser.role === 'SUPER_ADMIN' ? handleOpenSpreadsheet : undefined}
+                onOpenDriveModal={currentUser.role === 'SUPER_ADMIN' ? handleOpenDrive : undefined}
               />
             )}
 
@@ -426,11 +433,13 @@ export default function App() {
         }}
       />
 
-      {/* 2. Google Spreadsheet Sync & Database Manager */}
-      <SpreadsheetSyncModal
-        isOpen={isSpreadsheetModalOpen}
-        onClose={() => setIsSpreadsheetModalOpen(false)}
-      />
+      {/* 2. Google Spreadsheet Sync & Database Manager (SUPER ADMIN ONLY) */}
+      {currentUser.role === 'SUPER_ADMIN' && (
+        <SpreadsheetSyncModal
+          isOpen={isSpreadsheetModalOpen}
+          onClose={() => setIsSpreadsheetModalOpen(false)}
+        />
+      )}
 
       {/* 3. Register Member Modal */}
       <MemberFormModal
@@ -560,11 +569,13 @@ export default function App() {
         }}
       />
 
-      {/* 15. Google Drive Media Repository Modal */}
-      <DriveMediaRepositoryModal
-        isOpen={isDriveModalOpen}
-        onClose={() => setIsDriveModalOpen(false)}
-      />
+      {/* 15. Google Drive Media Repository Modal (SUPER ADMIN ONLY) */}
+      {currentUser.role === 'SUPER_ADMIN' && (
+        <DriveMediaRepositoryModal
+          isOpen={isDriveModalOpen}
+          onClose={() => setIsDriveModalOpen(false)}
+        />
+      )}
     </div>
   );
 }

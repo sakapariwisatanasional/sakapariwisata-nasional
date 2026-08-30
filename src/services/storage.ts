@@ -170,7 +170,12 @@ class StorageService {
   public getUsers(): CurrentUser[] {
     try {
       const data = localStorage.getItem(STORAGE_KEYS.USERS);
-      return data ? JSON.parse(data) : DEMO_USERS;
+      const storedUsers: CurrentUser[] = data ? JSON.parse(data) : [];
+      // Combine stored users with DEMO_USERS to guarantee all role personas exist
+      const userMap = new Map<string, CurrentUser>();
+      DEMO_USERS.forEach(u => userMap.set(u.id, u));
+      storedUsers.forEach(u => userMap.set(u.id, u));
+      return Array.from(userMap.values());
     } catch {
       return DEMO_USERS;
     }

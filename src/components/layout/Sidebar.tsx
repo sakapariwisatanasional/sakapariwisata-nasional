@@ -110,35 +110,27 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <span className="flex-1">Halaman Utama (Landing)</span>
         </button>
 
-        {/* Dashboard */}
-        <button
-          onClick={() => handleItemClick('dashboard')}
-          className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl font-medium text-sm transition-all text-left cursor-pointer ${
-            currentTab === 'dashboard'
-              ? 'bg-purple-600/20 text-purple-300 font-semibold border border-purple-500/30 shadow-xs'
-              : 'text-slate-400 hover:bg-slate-900 hover:text-slate-200'
-          }`}
-        >
-          <LayoutDashboard className={`w-4 h-4 ${currentTab === 'dashboard' ? 'text-purple-400' : 'text-slate-400'}`} />
-          <span className="flex-1">Dashboard Pengurus</span>
-          {currentTab === 'dashboard' && <div className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse" />}
-        </button>
-
-        {/* Member Management or My Card */}
+        {/* Dashboard Menu Item - Adapted to Role */}
         {isAdmin && (
           <button
-            onClick={() => handleItemClick('members')}
+            onClick={() => handleItemClick('dashboard')}
             className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl font-medium text-sm transition-all text-left cursor-pointer ${
-              currentTab === 'members'
+              currentTab === 'dashboard'
                 ? 'bg-purple-600/20 text-purple-300 font-semibold border border-purple-500/30 shadow-xs'
                 : 'text-slate-400 hover:bg-slate-900 hover:text-slate-200'
             }`}
           >
-            <Users className={`w-4 h-4 ${currentTab === 'members' ? 'text-purple-400' : 'text-slate-400'}`} />
-            <span className="flex-1">Manajemen Anggota</span>
+            <LayoutDashboard className={`w-4 h-4 ${currentTab === 'dashboard' ? 'text-purple-400' : 'text-slate-400'}`} />
+            <span className="flex-1 truncate">
+              {isSuperAdmin ? 'Dashboard Super Admin' : 
+               currentUser.role === 'ADMIN_PROVINCE' ? 'Dashboard Kwarda' :
+               currentUser.role === 'ADMIN_REGENCY' ? 'Dashboard Kwarcab' : 'Dashboard Kwarran'}
+            </span>
+            {currentTab === 'dashboard' && <div className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse" />}
           </button>
         )}
 
+        {/* Member Personal KTA */}
         {isMember && (
           <button
             onClick={() => handleItemClick('my-card')}
@@ -150,6 +142,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
           >
             <CreditCard className={`w-4 h-4 ${currentTab === 'my-card' ? 'text-purple-400' : 'text-slate-400'}`} />
             <span className="flex-1">Kartu Anggota (KTA)</span>
+            {currentTab === 'my-card' && <div className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse" />}
+          </button>
+        )}
+
+        {/* Member Management (Admin & Operator Only) */}
+        {isAdmin && (
+          <button
+            onClick={() => handleItemClick('members')}
+            className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl font-medium text-sm transition-all text-left cursor-pointer ${
+              currentTab === 'members'
+                ? 'bg-purple-600/20 text-purple-300 font-semibold border border-purple-500/30 shadow-xs'
+                : 'text-slate-400 hover:bg-slate-900 hover:text-slate-200'
+            }`}
+          >
+            <Users className={`w-4 h-4 ${currentTab === 'members' ? 'text-purple-400' : 'text-slate-400'}`} />
+            <span className="flex-1">Manajemen Anggota</span>
           </button>
         )}
 
@@ -177,7 +185,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         >
           <Utensils className={`w-4 h-4 ${currentTab === 'culinary-souvenirs' ? 'text-purple-400' : 'text-slate-400'}`} />
           <span className="flex-1">Kuliner & Cinderamata</span>
-          <span className="text-[10px] px-1.5 py-0.5 bg-amber-500/20 text-amber-300 rounded-md font-bold">Baru</span>
+          <span className="text-[10px] px-1.5 py-0.5 bg-amber-500/20 text-amber-300 rounded-md font-bold">4 Krida</span>
         </button>
 
         {/* Skills & Certification */}
@@ -219,58 +227,67 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <span className="flex-1">Portal Publik & Wisata</span>
         </button>
 
-        {/* Administration Section */}
+        {/* Administration Section (Only for Admins) */}
         {isAdmin && (
           <div className="pt-4">
             <div className="text-[11px] font-bold text-slate-400 uppercase tracking-widest px-3 py-2 mb-1">
-              Administrasi Wilayah
+              {isSuperAdmin ? 'Administrasi Nasional' : 'Administrasi Wilayah'}
             </div>
 
-            <button
-              onClick={() => handleItemClick('territories')}
-              className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl font-medium text-sm transition-all text-left cursor-pointer ${
-                currentTab === 'territories'
-                  ? 'bg-purple-600/20 text-purple-300 font-semibold border border-purple-500/30 shadow-xs'
-                  : 'text-slate-400 hover:bg-slate-900 hover:text-slate-200'
-              }`}
-            >
-              <MapPin className={`w-4 h-4 ${currentTab === 'territories' ? 'text-purple-400' : 'text-slate-400'}`} />
-              <span className="flex-1">Master Wilayah</span>
-            </button>
+            {/* Master Wilayah: Super Admin & Province Admins */}
+            {(isSuperAdmin || currentUser.role === 'ADMIN_PROVINCE') && (
+              <button
+                onClick={() => handleItemClick('territories')}
+                className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl font-medium text-sm transition-all text-left cursor-pointer ${
+                  currentTab === 'territories'
+                    ? 'bg-purple-600/20 text-purple-300 font-semibold border border-purple-500/30 shadow-xs'
+                    : 'text-slate-400 hover:bg-slate-900 hover:text-slate-200'
+                }`}
+              >
+                <MapPin className={`w-4 h-4 ${currentTab === 'territories' ? 'text-purple-400' : 'text-slate-400'}`} />
+                <span className="flex-1">Master Wilayah</span>
+              </button>
+            )}
 
-            <button
-              onClick={() => handleItemClick('audit-logs')}
-              className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl font-medium text-sm transition-all text-left cursor-pointer ${
-                currentTab === 'audit-logs'
-                  ? 'bg-emerald-600/15 text-emerald-400 font-semibold border border-emerald-500/20 shadow-sm'
-                  : 'text-slate-400 hover:bg-slate-800/70 hover:text-slate-200'
-              }`}
-            >
-              <History className={`w-4 h-4 ${currentTab === 'audit-logs' ? 'text-emerald-400' : 'text-slate-400'}`} />
-              <span className="flex-1">Audit Trail & Log</span>
-            </button>
+            {/* Audit Trail & Log: SUPER ADMIN ONLY */}
+            {isSuperAdmin && (
+              <button
+                onClick={() => handleItemClick('audit-logs')}
+                className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl font-medium text-sm transition-all text-left cursor-pointer ${
+                  currentTab === 'audit-logs'
+                    ? 'bg-emerald-600/15 text-emerald-400 font-semibold border border-emerald-500/20 shadow-sm'
+                    : 'text-slate-400 hover:bg-slate-800/70 hover:text-slate-200'
+                }`}
+              >
+                <History className={`w-4 h-4 ${currentTab === 'audit-logs' ? 'text-emerald-400' : 'text-slate-400'}`} />
+                <span className="flex-1">Audit Trail & Log</span>
+              </button>
+            )}
 
-            {onOpenSpreadsheetModal && (
+            {/* Google Spreadsheet & Google Drive: SUPER ADMIN KWARTIR NASIONAL ONLY */}
+            {isSuperAdmin && onOpenSpreadsheetModal && (
               <button
                 onClick={() => {
                   onOpenSpreadsheetModal();
                   if (onCloseMobile) onCloseMobile();
                 }}
                 className="w-full flex items-center gap-3 px-3.5 py-3 rounded-xl font-medium text-sm transition-all text-left cursor-pointer bg-emerald-950/40 text-emerald-300 hover:bg-emerald-950/70 border border-emerald-800/40 mt-1"
+                title="Akses Database Google Spreadsheet (Super Admin Kwarnas)"
               >
                 <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
                 <span className="flex-1">Database Spreadsheet</span>
-                <span className="text-[9px] px-1.5 py-0.5 bg-emerald-900 text-emerald-200 rounded font-mono">Live</span>
+                <span className="text-[9px] px-1.5 py-0.5 bg-emerald-900 text-emerald-200 rounded font-mono">Kwarnas</span>
               </button>
             )}
 
-            {onOpenDriveModal && (
+            {isSuperAdmin && onOpenDriveModal && (
               <button
                 onClick={() => {
                   onOpenDriveModal();
                   if (onCloseMobile) onCloseMobile();
                 }}
                 className="w-full flex items-center gap-3 px-3.5 py-3 rounded-xl font-medium text-sm transition-all text-left cursor-pointer bg-purple-950/40 text-purple-300 hover:bg-purple-950/70 border border-purple-800/40 mt-1"
+                title="Akses Media Google Drive Repository (Super Admin Kwarnas)"
               >
                 <FolderOpen className="w-4 h-4 text-purple-400" />
                 <span className="flex-1">Media Google Drive</span>
