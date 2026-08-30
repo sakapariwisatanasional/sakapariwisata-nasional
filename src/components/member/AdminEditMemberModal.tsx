@@ -184,6 +184,8 @@ export const AdminEditMemberModal: React.FC<AdminEditMemberModalProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (isSubmitting) return;
+
     if (isUnauthorized) {
       alert('Akses Ditolak: Anda tidak memiliki wewenang untuk mengedit data anggota di luar wilayah Kwartir Anda.');
       return;

@@ -97,6 +97,7 @@ export const CulinarySouvenirFormModal: React.FC<CulinarySouvenirFormModalProps>
   const [contactPhone, setContactPhone] = useState('0812-3456-7890');
   const [address, setAddress] = useState('');
   const [tagInput, setTagInput] = useState('Halal, Khas Daerah, Binaan Saka');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Territory Selection
   const [provinceId, setProvinceId] = useState('32'); // Default Jawa Barat
@@ -217,6 +218,8 @@ export const CulinarySouvenirFormModal: React.FC<CulinarySouvenirFormModalProps>
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
+
     if (!name.trim()) {
       alert('Mohon isi nama produk atau layanan karya anggota.');
       return;
@@ -229,6 +232,8 @@ export const CulinarySouvenirFormModal: React.FC<CulinarySouvenirFormModalProps>
       alert('Mohon sertakan foto/media produk.');
       return;
     }
+
+    setIsSubmitting(true);
 
     const tags = tagInput
       .split(',')
@@ -265,16 +270,23 @@ export const CulinarySouvenirFormModal: React.FC<CulinarySouvenirFormModalProps>
       status: editItem?.status || (isOperator ? 'APPROVED' : 'PENDING_APPROVAL')
     };
 
-    if (editItem) {
-      const updated = storage.updateCulinarySouvenir(editItem.id, payload, currentUser);
-      if (updated) {
-        onSuccess(updated);
+    try {
+      if (editItem) {
+        const updated = storage.updateCulinarySouvenir(editItem.id, payload, currentUser);
+        if (updated) {
+          setIsSubmitting(false);
+          onSuccess(updated);
+          onClose();
+        }
+      } else {
+        const created = storage.addCulinarySouvenir(payload, currentUser);
+        setIsSubmitting(false);
+        onSuccess(created);
         onClose();
       }
-    } else {
-      const created = storage.addCulinarySouvenir(payload, currentUser);
-      onSuccess(created);
-      onClose();
+    } catch (err: any) {
+      setIsSubmitting(false);
+      alert('Gagal menyimpan produk: ' + err.message);
     }
   };
 
@@ -659,15 +671,18 @@ export const CulinarySouvenirFormModal: React.FC<CulinarySouvenirFormModalProps>
             <button
               type="button"
               onClick={handleSubmit}
-              className="px-6 py-2 text-xs font-bold text-white bg-gradient-to-r from-purple-700 to-indigo-600 hover:from-purple-600 hover:to-indigo-500 rounded-xl shadow-md shadow-purple-950/20 active:scale-95 transition-all cursor-pointer flex items-center gap-2"
+              disabled={isSubmitting}
+              className="px-6 py-2 text-xs font-bold text-white bg-gradient-to-r from-purple-700 to-indigo-600 hover:from-purple-600 hover:to-indigo-500 rounded-xl shadow-md shadow-purple-950/20 active:scale-95 transition-all cursor-pointer flex items-center gap-2 disabled:opacity-50"
             >
               <Sparkles className="w-3.5 h-3.5 text-amber-300" />
               <span>
-                {editItem 
-                  ? 'Simpan Perubahan' 
-                  : isOperator 
-                    ? 'Terbitkan Langsung ke Galeri' 
-                    : 'Ajukan ke Operator Wilayah'}
+                {isSubmitting
+                  ? 'Menyimpan...'
+                  : editItem 
+                    ? 'Simpan Perubahan' 
+                    : isOperator 
+                      ? 'Terbitkan Langsung ke Galeri' 
+                      : 'Ajukan ke Operator Wilayah'}
               </span>
             </button>
           </div>

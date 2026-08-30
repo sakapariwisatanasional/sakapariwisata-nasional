@@ -44,6 +44,7 @@ import {
 import { ipLocationService, POPULAR_DESTINATIONS, DetectedLocation } from '../../services/ipLocationService';
 import { PROVINCES_DATA } from '../../data/indonesiaTerritories';
 import { storage } from '../../services/storage';
+import { formatDriveImageUrl } from '../common/SakaLogo';
 import { TourPackageDetailModal } from '../tourism/TourPackageDetailModal';
 import { CulinarySouvenirDetailModal } from '../culinary/CulinarySouvenirDetailModal';
 import { MemberVerificationModal } from '../member/MemberVerificationModal';
@@ -1283,9 +1284,15 @@ export const IntegratedTourismShowcaseGallery: React.FC<IntegratedTourismShowcas
                         <div className="flex items-center gap-3 min-w-0">
                           <div className="relative flex-shrink-0">
                             <img
-                              src={member.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150'}
+                              src={formatDriveImageUrl(member.avatarUrl) || member.avatarUrl || (member.gender === 'PEREMPUAN' ? 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150' : 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150')}
                               alt={member.fullName}
+                              referrerPolicy="no-referrer"
                               className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl object-cover border-2 border-purple-200 shadow-2xs"
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).src = member.gender === 'PEREMPUAN'
+                                  ? 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150'
+                                  : 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150';
+                              }}
                             />
                             <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-emerald-500 rounded-full border-2 border-white flex items-center justify-center text-white" title="Terverifikasi Aktif">
                               <CheckCircle2 className="w-3 h-3" />

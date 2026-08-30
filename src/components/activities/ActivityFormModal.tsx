@@ -265,6 +265,8 @@ export const ActivityFormModal: React.FC<ActivityFormModalProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
+
     if (!title.trim() || !locationName.trim()) {
       alert('Mohon isi Judul Kegiatan dan Lokasi Kegiatan.');
       return;
@@ -783,10 +785,14 @@ export const ActivityFormModal: React.FC<ActivityFormModalProps> = ({
             <button
               type="submit"
               disabled={isSubmitting}
-              className="px-6 py-2.5 bg-purple-700 hover:bg-purple-600 active:bg-purple-800 text-white text-xs font-bold rounded-xl shadow-md transition-all cursor-pointer flex items-center gap-2"
+              className="px-6 py-2.5 bg-purple-700 hover:bg-purple-600 active:bg-purple-800 text-white text-xs font-bold rounded-xl shadow-md transition-all cursor-pointer flex items-center gap-2 disabled:opacity-50"
             >
               <CheckCircle2 className="w-4 h-4 text-purple-200" />
-              <span>{initialActivity ? 'Simpan Perubahan Agenda' : 'Terbitkan Agenda Kegiatan'}</span>
+              <span>
+                {isSubmitting 
+                  ? 'Menyimpan...' 
+                  : (initialActivity ? 'Simpan Perubahan Agenda' : 'Terbitkan Agenda Kegiatan')}
+              </span>
             </button>
           </div>
 

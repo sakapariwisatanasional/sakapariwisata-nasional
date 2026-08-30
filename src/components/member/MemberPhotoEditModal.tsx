@@ -36,7 +36,7 @@ const OFFICIAL_PRESETS = [
   {
     name: 'Seragam Pramuka Pria (Latar Merah)',
     gender: 'Laki-laki',
-    url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500&auto=format&fit=crop&q=80'
+    url: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=500&auto=format&fit=crop&q=80'
   },
   {
     name: 'Seragam Pramuka Pria (Latar Biru)',

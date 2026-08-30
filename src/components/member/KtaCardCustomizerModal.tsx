@@ -116,7 +116,7 @@ export const KtaCardCustomizerModal: React.FC<KtaCardCustomizerModalProps> = ({
     branchName: 'Kwarran Ciawi',
     gugusDepan: '04.091 - 04.092',
     krida: 'Krida Pemandu',
-    avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop&q=80',
+    avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300&auto=format&fit=crop&q=80',
     registeredAt: '2026-01-15T08:00:00.000Z',
     provinceId: '32',
     regencyId: '32.06',

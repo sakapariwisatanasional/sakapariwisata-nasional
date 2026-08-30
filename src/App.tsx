@@ -346,6 +346,9 @@ export default function App() {
                 onApproveMemberQuick={handleApproveMember}
                 onViewTourDetail={(t) => setSelectedTourDetail(t)}
                 onOpenEditCardModal={() => setIsEditKtaModalOpen(true)}
+                onOpenEditPhotoModal={(m) => setEditingPhotoMember(m)}
+                onOpenEditMemberModal={(m) => setEditingMember(m)}
+                onOpenPrintPdfModal={(m) => setPrintingKtaMember(m)}
                 onOpenCulinaryFormModal={(item) => {
                   setEditingCulinaryItem(item || null);
                   setIsCulinaryFormOpen(true);

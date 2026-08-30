@@ -210,9 +210,15 @@ export const DigitalMemberCard: React.FC<DigitalMemberCardProps> = ({
               {/* Photo */}
               <div className="relative flex-shrink-0 group">
                 <img
-                  src={member.avatarUrl}
+                  src={formatDriveImageUrl(member.avatarUrl) || member.avatarUrl || (member.gender === 'PEREMPUAN' ? 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=300&auto=format&fit=crop&q=80' : 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300&auto=format&fit=crop&q=80')}
                   alt={member.fullName}
+                  referrerPolicy="no-referrer"
                   className={`w-20 h-24 object-cover rounded-xl border-2 ${theme.photoBorder} shadow-md bg-slate-900`}
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = member.gender === 'PEREMPUAN'
+                      ? 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=300&auto=format&fit=crop&q=80'
+                      : 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300&auto=format&fit=crop&q=80';
+                  }}
                 />
                 <div className={`absolute -bottom-1.5 -right-1.5 w-5 h-5 ${theme.photoTick} rounded-full border-2 border-slate-900 flex items-center justify-center text-[10px] text-white font-bold`}>
                   ✓

@@ -45,6 +45,9 @@ interface DashboardViewProps {
   onApproveMemberQuick: (memberId: string) => void;
   onViewTourDetail: (tour: TourPackage) => void;
   onOpenEditCardModal?: () => void;
+  onOpenEditPhotoModal?: (member: Member) => void;
+  onOpenEditMemberModal?: (member: Member) => void;
+  onOpenPrintPdfModal?: (member: Member) => void;
   onOpenCulinaryFormModal?: (item?: CulinarySouvenirItem) => void;
   onSelectCulinaryDetail?: (item: CulinarySouvenirItem) => void;
   onOpenSpreadsheetModal?: () => void;
@@ -63,6 +66,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onApproveMemberQuick,
   onViewTourDetail,
   onOpenEditCardModal,
+  onOpenEditPhotoModal,
+  onOpenEditMemberModal,
+  onOpenPrintPdfModal,
   onOpenCulinaryFormModal,
   onSelectCulinaryDetail,
   onOpenSpreadsheetModal,
@@ -274,7 +280,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   // 2. TAMPILAN DASHBOARD KHUSUS PERAN ANGGOTA (MEMBER PERSONAL PORTFOLIO)
   // =========================================================================
   if (isMember) {
-    const memberProfile = members.find(m => m.id === currentUser.memberId) || members.find(m => m.status === 'ACTIVE') || members[0];
+    const memberProfile = 
+      members.find(m => m.id === currentUser.memberId) || 
+      members.find(m => m.userId === currentUser.id) ||
+      members.find(m => m.fullName.toLowerCase().trim() === currentUser.name.toLowerCase().trim()) ||
+      members.find(m => m.status === 'ACTIVE') || 
+      members[0];
     return (
       <div className="space-y-6 sm:space-y-8 pb-16">
         {/* Welcome Banner Anggota */}
@@ -386,6 +397,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <DigitalMemberCard
                 member={memberProfile}
                 onVerifyClick={onVerifyMember}
+                onEditPhoto={onOpenEditPhotoModal}
+                onEditMemberProfile={onOpenEditMemberModal}
+                onPrintPdf={onOpenPrintPdfModal}
                 allowAdminEdit={false}
                 showControls={true}
               />
@@ -410,7 +424,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   // =========================================================================
   // 3. TAMPILAN DASHBOARD UNTUK ADMINISTRATOR / OPERATOR KWARTIR
   // =========================================================================
-  const previewMember = scopedMembers.find(m => m.id === currentUser.memberId) || scopedMembers.find(m => m.status === 'ACTIVE') || members.find(m => m.status === 'ACTIVE') || members[0];
+  const previewMember = 
+    scopedMembers.find(m => m.id === currentUser.memberId) || 
+    scopedMembers.find(m => m.userId === currentUser.id) || 
+    scopedMembers.find(m => m.fullName.toLowerCase().trim() === currentUser.name.toLowerCase().trim()) ||
+    scopedMembers.find(m => m.status === 'ACTIVE') || 
+    members.find(m => m.status === 'ACTIVE') || 
+    members[0];
   const recentRegistrations = scopedMembers.slice(0, 5);
 
   const getDashboardTitle = () => {
@@ -899,6 +919,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 member={previewMember}
                 onVerifyClick={onVerifyMember}
                 onEditCard={isSuperAdmin ? onOpenEditCardModal : undefined}
+                onEditPhoto={onOpenEditPhotoModal}
+                onEditMemberProfile={onOpenEditMemberModal}
+                onPrintPdf={onOpenPrintPdfModal}
                 allowAdminEdit={isSuperAdmin}
                 showControls={true}
               />

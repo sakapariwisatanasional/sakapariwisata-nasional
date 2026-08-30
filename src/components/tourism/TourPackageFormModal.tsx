@@ -50,6 +50,7 @@ export const TourPackageFormModal: React.FC<TourPackageFormModalProps> = ({
   const [transportationType, setTransportationType] = useState('Shuttle / Mobil Antar-Jemput');
   const [contactPhone, setContactPhone] = useState('0812-3456-7890');
   const [contactEmail, setContactEmail] = useState('wisata@sakapariwisata.id');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [facilityList, setFacilityList] = useState<string[]>([
     'Pemandu Berlisensi Saka Pariwisata',
@@ -121,10 +122,14 @@ export const TourPackageFormModal: React.FC<TourPackageFormModalProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
+
     if (!title || !description || !locationAddress) {
       alert('Harap isi judul, deskripsi, dan alamat lokasi wisata.');
       return;
     }
+
+    setIsSubmitting(true);
 
     const currentProvince = provinces.find(p => p.id === selectedProvinceId);
     const currentRegency = regencies.find(r => r.id === selectedRegencyId);
@@ -135,38 +140,44 @@ export const TourPackageFormModal: React.FC<TourPackageFormModalProps> = ({
       currentUser.role === 'ADMIN_REGENCY' ? 'REGENCY' :
       currentUser.role === 'ADMIN_PROVINCE' ? 'PROVINCE' : 'PARTNER';
 
-    storage.createTourPackage({
-      title,
-      description,
-      category,
-      coverImage,
-      galleryImages: [],
-      ownerType,
-      ownerId: currentUser.memberId || currentUser.id,
-      ownerName: currentUser.name,
-      provinceId: selectedProvinceId,
-      provinceName: currentProvince?.name || 'Jawa Barat',
-      regencyId: selectedRegencyId,
-      regencyName: currentRegency?.name || 'Tasikmalaya',
-      districtName: 'Wilayah Terkait',
-      branchName: currentUser.jurisdictionName,
-      locationAddress,
-      durationDays,
-      pricePerPerson,
-      minCapacity,
-      maxCapacity,
-      facilities: facilityList,
-      lodgingType,
-      transportationType,
-      guideProvided: true,
-      contactPhone,
-      contactEmail,
-      itinerary: itineraries
-    });
+    try {
+      storage.createTourPackage({
+        title,
+        description,
+        category,
+        coverImage,
+        galleryImages: [],
+        ownerType,
+        ownerId: currentUser.memberId || currentUser.id,
+        ownerName: currentUser.name,
+        provinceId: selectedProvinceId,
+        provinceName: currentProvince?.name || 'Jawa Barat',
+        regencyId: selectedRegencyId,
+        regencyName: currentRegency?.name || 'Tasikmalaya',
+        districtName: 'Wilayah Terkait',
+        branchName: currentUser.jurisdictionName,
+        locationAddress,
+        durationDays,
+        pricePerPerson,
+        minCapacity,
+        maxCapacity,
+        facilities: facilityList,
+        lodgingType,
+        transportationType,
+        guideProvided: true,
+        contactPhone,
+        contactEmail,
+        itinerary: itineraries
+      });
 
-    alert('Paket wisata berhasil diajukan! Status awal adalah SUBMITTED dan akan ditinjau oleh Admin Pembina.');
-    onSuccess();
-    onClose();
+      alert('Paket wisata berhasil diajukan! Status awal adalah SUBMITTED dan akan ditinjau oleh Admin Pembina.');
+      setIsSubmitting(false);
+      onSuccess();
+      onClose();
+    } catch (err: any) {
+      setIsSubmitting(false);
+      alert('Gagal mengajukan paket wisata: ' + err.message);
+    }
   };
 
   const sampleCoverImages = [
@@ -484,10 +495,11 @@ export const TourPackageFormModal: React.FC<TourPackageFormModalProps> = ({
             </button>
             <button
               type="submit"
-              className="px-6 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold rounded-xl shadow-md transition-all flex items-center gap-2 cursor-pointer"
+              disabled={isSubmitting}
+              className="px-6 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold rounded-xl shadow-md transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
             >
               <Sparkles className="w-4 h-4" />
-              <span>Ajukan Paket Wisata</span>
+              <span>{isSubmitting ? 'Mengajukan...' : 'Ajukan Paket Wisata'}</span>
             </button>
           </div>
         </form>

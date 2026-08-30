@@ -187,7 +187,7 @@ export async function searchMemberInRemoteSpreadsheet(rawInput: string): Promise
         nationalMemberNumber: kta || undefined,
         fullName,
         nikMasked: '3201**********01',
-        avatarUrl: row['Foto URL'] || row['foto_url'] || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&fit=crop&q=80',
+        avatarUrl: row['Foto URL'] || row['foto_url'] || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&fit=crop&q=80',
         gender: 'LAKI_LAKI',
         birthPlace: 'Indonesia',
         birthDate: '2000-01-01',

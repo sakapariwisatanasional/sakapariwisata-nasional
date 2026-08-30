@@ -432,7 +432,10 @@ export const CompetentGuidesSection: React.FC<CompetentGuidesSectionProps> = ({
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredMembers.map((member) => {
-              const avatar = formatDriveImageUrl(member.avatarUrl) || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop&q=80';
+              const defaultAvatar = member.gender === 'PEREMPUAN'
+                ? 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=300&auto=format&fit=crop&q=80'
+                : 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300&auto=format&fit=crop&q=80';
+              const avatar = formatDriveImageUrl(member.avatarUrl) || member.avatarUrl || defaultAvatar;
               const topSkills = member.skills.slice(0, 3);
               const topCert = member.certifications[0];
               const waLink = getWhatsAppLink(member);
@@ -459,7 +462,7 @@ export const CompetentGuidesSection: React.FC<CompetentGuidesSectionProps> = ({
                           referrerPolicy="no-referrer"
                           className="w-16 h-16 rounded-2xl object-cover border-2 border-purple-500/40 group-hover:scale-105 transition-transform duration-300 shadow-md"
                           onError={(e) => {
-                            (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop&q=80';
+                            (e.target as HTMLImageElement).src = defaultAvatar;
                           }}
                         />
                         <div className="absolute -bottom-1.5 -right-1.5 w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-md border-2 border-slate-950" title="KTA Terverifikasi">

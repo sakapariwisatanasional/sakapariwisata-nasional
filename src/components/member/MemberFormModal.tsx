@@ -59,9 +59,10 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
   const [educationLevel, setEducationLevel] = useState('SMA / SMK / Sederajat');
   const [occupation, setOccupation] = useState('Pelajar / Mahasiswa');
   const [bio, setBio] = useState('');
-  const [avatarUrl, setAvatarUrl] = useState('https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop&q=80');
+  const [avatarUrl, setAvatarUrl] = useState('https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300&auto=format&fit=crop&q=80');
   const [photoInputUrl, setPhotoInputUrl] = useState('');
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDraggingPhoto, setIsDraggingPhoto] = useState(false);
   const [photoUploadSource, setPhotoUploadSource] = useState<'FILE' | 'URL'>('FILE');
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -239,6 +240,8 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (isSubmitting) return;
+
     if (!fullName || !nik || !email || !phone || !gugusDepan) {
       alert('Harap lengkapi semua data wajib yang ditandai bintang (*)');
       return;
@@ -249,6 +252,8 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
       alert(`Peringatan Akses: Anda hanya diizinkan mendaftarkan anggota pada Kwartir Cabang Anda (${currentUser.jurisdictionName}).`);
       return;
     }
+
+    setIsSubmitting(true);
 
     const currentProvince = provinces.find(p => p.id === selectedProvinceId);
     const currentRegency = regencies.find(r => r.id === selectedRegencyId);
@@ -274,45 +279,51 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
       };
     });
 
-    storage.registerMember({
-      userId: `user-${Date.now()}`,
-      fullName,
-      nikMasked: maskedNik,
-      avatarUrl: avatarUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=300&auto=format&fit=crop&q=80',
-      gender,
-      birthPlace: birthPlace || 'Tasikmalaya',
-      birthDate,
-      phone,
-      email,
-      address: address || 'Jl. Pramuka Raya',
-      
-      provinceId: selectedProvinceId,
-      provinceName: currentProvince?.name || 'Jawa Barat',
-      regencyId: selectedRegencyId,
-      regencyName: currentRegency?.name || 'Kwartir Cabang',
-      districtId: selectedDistrictId,
-      districtName: currentDistrict?.name || 'Kecamatan',
-      branchId: selectedBranchId || 'branch-default',
-      branchName: currentBranch?.name || `Kwarran ${currentDistrict?.name || 'Pariwisata'}`,
-      
-      gugusDepan,
-      joinYear,
-      currentPosition: `Calon Anggota ${krida}`,
-      krida,
-      educationLevel,
-      occupation,
-      bio: bio || 'Calon anggota Saka Pariwisata yang siap berkontribusi untuk pariwisata nusantara.',
-      skills: memberSkills,
-      certifications: []
-    });
+    try {
+      storage.registerMember({
+        userId: `user-${Date.now()}`,
+        fullName,
+        nikMasked: maskedNik,
+        avatarUrl: avatarUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=300&auto=format&fit=crop&q=80',
+        gender,
+        birthPlace: birthPlace || 'Tasikmalaya',
+        birthDate,
+        phone,
+        email,
+        address: address || 'Jl. Pramuka Raya',
+        
+        provinceId: selectedProvinceId,
+        provinceName: currentProvince?.name || 'Jawa Barat',
+        regencyId: selectedRegencyId,
+        regencyName: currentRegency?.name || 'Kwartir Cabang',
+        districtId: selectedDistrictId,
+        districtName: currentDistrict?.name || 'Kecamatan',
+        branchId: selectedBranchId || 'branch-default',
+        branchName: currentBranch?.name || `Kwarran ${currentDistrict?.name || 'Pariwisata'}`,
+        
+        gugusDepan,
+        joinYear,
+        currentPosition: `Calon Anggota ${krida}`,
+        krida,
+        educationLevel,
+        occupation,
+        bio: bio || 'Calon anggota Saka Pariwisata yang siap berkontribusi untuk pariwisata nusantara.',
+        skills: memberSkills,
+        certifications: []
+      });
 
-    alert('Pendaftaran berhasil diajukan! Data anggota telah dicatat khusus pada Kwartir Cabang Anda.');
-    onSuccess();
-    onClose();
+      alert('Pendaftaran berhasil diajukan! Data anggota telah dicatat khusus pada Kwartir Cabang Anda.');
+      setIsSubmitting(false);
+      onSuccess();
+      onClose();
+    } catch (err: any) {
+      setIsSubmitting(false);
+      alert('Gagal mendaftarkan anggota: ' + err.message);
+    }
   };
 
   const sampleAvatars = [
-    'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=300&auto=format&fit=crop&q=80',
     'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300&auto=format&fit=crop&q=80',
     'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=300&auto=format&fit=crop&q=80',
     'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=300&auto=format&fit=crop&q=80'
@@ -823,10 +834,11 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
             </button>
             <button
               type="submit"
-              className="px-6 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold rounded-xl shadow-lg shadow-emerald-950/20 transition-all flex items-center gap-2 cursor-pointer"
+              disabled={isSubmitting}
+              className="px-6 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold rounded-xl shadow-lg shadow-emerald-950/20 transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
             >
               <Sparkles className="w-4 h-4" />
-              <span>Kirim Pendaftaran</span>
+              <span>{isSubmitting ? 'Menyimpan...' : 'Kirim Pendaftaran'}</span>
             </button>
           </div>
         </form>

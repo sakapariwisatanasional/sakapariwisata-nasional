@@ -37,6 +37,9 @@ export interface SpreadsheetRowMember {
 
 class SpreadsheetService {
   private config: SpreadsheetConfig;
+  private isPushing = false;
+  private isSettingUp = false;
+  private isSyncing = false;
 
   constructor() {
     this.config = this.loadConfig();
@@ -185,6 +188,11 @@ class SpreadsheetService {
    * Tarik data dari Google Spreadsheet dan perbarui state aplikasi
    */
   public async syncFromSpreadsheet(): Promise<{ success: boolean; count: number; message: string }> {
+    if (this.isSyncing) {
+      return { success: false, count: 0, message: 'Proses sinkronisasi sedang berjalan...' };
+    }
+
+    this.isSyncing = true;
     this.saveConfig({ status: 'SYNCING' });
 
     try {
@@ -225,7 +233,7 @@ class SpreadsheetService {
           const email = row['Email'] || row['email'] || `member${idx + 1}@pramuka.id`;
           const phone = row['Nomor WA'] || row['No WhatsApp'] || row['Telepon'] || row['col_4'] || '081234567890';
           const status = (row['Status'] || row['status'] || 'ACTIVE').toUpperCase();
-          const avatarUrl = row['Foto URL'] || row['foto_url'] || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&fit=crop&q=80';
+          const avatarUrl = row['Foto URL'] || row['foto_url'] || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&fit=crop&q=80';
           const roleRaw = row['Role'] || row['Peran'] || row['Jabatan'] || row['Hak Akses'] || row['Wewenang'] || '';
           const role = parseRole(roleRaw);
 
@@ -273,7 +281,7 @@ class SpreadsheetService {
 
         // Simpan ke storage jika ada data valid
         if (importedMembers.length > 0) {
-          // Gabungkan dengan anggota yang sudah ada (hindari duplikat ID/KTA)
+          // Gabungkan dengan anggota yang sudah ada (hindari duplikat ID, KTA, atau Email)
           const merged = [...existingMembers];
           const mergedUsers = [...existingUsers];
 
@@ -283,14 +291,22 @@ class SpreadsheetService {
             const username = rawRow['Username'] || rawRow['username'] || newM.email.split('@')[0];
             const parsedRole = newM.operatorRole || (parseRole(rawRow['Role'] || rawRow['Peran']) || 'MEMBER');
 
-            const exists = merged.some(m => (newM.nationalMemberNumber && m.nationalMemberNumber === newM.nationalMemberNumber) || m.id === newM.id);
+            const exists = merged.some(m => 
+              (newM.nationalMemberNumber && m.nationalMemberNumber === newM.nationalMemberNumber) || 
+              m.id === newM.id ||
+              (newM.email && m.email && m.email.toLowerCase().trim() === newM.email.toLowerCase().trim())
+            );
             if (!exists) {
               merged.push(newM);
               addedCount++;
             }
 
             // Sync User record for login
-            const userIdx = mergedUsers.findIndex(u => u.email === newM.email || (u.memberId && u.memberId === newM.id) || (u.username && u.username === username));
+            const userIdx = mergedUsers.findIndex(u => 
+              (newM.email && u.email && u.email.toLowerCase().trim() === newM.email.toLowerCase().trim()) || 
+              (u.memberId && u.memberId === newM.id) || 
+              (u.username && u.username === username)
+            );
             const userObj: CurrentUser = {
               id: newM.userId,
               username: username,
@@ -313,6 +329,7 @@ class SpreadsheetService {
 
           storage.setMembers(merged);
           storage.setUsers(mergedUsers);
+          storage.deduplicateDatabase();
         }
 
         const successMsg = `Berhasil menyinkronkan database spreadsheet. ${rows.length} data baris terbaca (${addedCount} data baru ditambahkan).`;
@@ -322,6 +339,7 @@ class SpreadsheetService {
           lastError: undefined
         });
 
+        this.isSyncing = false;
         return { success: true, count: rows.length, message: successMsg };
       }
 
@@ -331,18 +349,24 @@ class SpreadsheetService {
         lastError: undefined
       });
 
+      this.isSyncing = false;
       return { 
         success: true, 
         count: 0, 
         message: 'Spreadsheet terhubung. Tidak ada baris baru yang perlu ditambahkan.' 
       };
     } catch (err: any) {
+      this.isSyncing = false;
       console.error('Sync failed:', err);
       this.saveConfig({
         status: 'ERROR',
-        lastError: err.message || 'Gagal menyinkronkan data dari spreadsheet.'
+        lastError: err.message || 'Gagal terhubung ke Google Spreadsheet'
       });
-      return { success: false, count: 0, message: err.message || 'Gagal membaca spreadsheet.' };
+      return {
+        success: false,
+        count: 0,
+        message: `Gagal sinkronisasi: ${err.message || 'Periksa apakah ID Spreadsheet dan nama sheet sudah benar.'}`
+      };
     }
   }
 
@@ -552,6 +576,16 @@ class SpreadsheetService {
       };
     }
 
+    if (this.isPushing) {
+      return {
+        success: false,
+        message: 'Proses pengunggahan data sedang berlangsung, mohon tunggu...',
+        counts
+      };
+    }
+
+    this.isPushing = true;
+
     try {
       const payload = {
         action: 'SYNC_ALL_DATA',
@@ -630,12 +664,14 @@ class SpreadsheetService {
         lastError: undefined
       });
 
+      this.isPushing = false;
       return {
         success: true,
         message: `Berhasil mengirim seluruh data ke Google Spreadsheet: ${members.length} Anggota, ${tours.length} Paket Wisata, ${culinary.length} Kuliner/Kriya, ${activities.length} Agenda Kegiatan.`,
         counts
       };
     } catch (err: any) {
+      this.isPushing = false;
       console.error('Push all failed:', err);
       return {
         success: false,
@@ -671,7 +707,6 @@ class SpreadsheetService {
         mimeType: base64Data.includes('data:image/png') ? 'image/png' : 'image/jpeg'
       };
 
-      // Coba kirim via POST
       await fetch(scriptUrl, {
         method: 'POST',
         mode: 'no-cors',
@@ -704,6 +739,14 @@ class SpreadsheetService {
       };
     }
 
+    if (this.isSettingUp) {
+      return {
+        success: false,
+        message: 'Proses inisialisasi folder sedang berjalan...'
+      };
+    }
+
+    this.isSettingUp = true;
     const actionUrl = scriptUrl.includes('?')
       ? `${scriptUrl}&action=SETUP_DRIVE_FOLDERS`
       : `${scriptUrl}?action=SETUP_DRIVE_FOLDERS`;
@@ -714,26 +757,22 @@ class SpreadsheetService {
         folderId: '16Ql42x6HBWJIB8ss7abnurS_Kne5HYvh'
       };
 
-      // 1. Eksekusi via POST no-cors
-      fetch(scriptUrl, {
+      // Eksekusi via POST no-cors tunggal
+      await fetch(scriptUrl, {
         method: 'POST',
         mode: 'no-cors',
         headers: { 'Content-Type': 'text/plain' },
         body: JSON.stringify(payload)
-      }).catch(console.error);
+      });
 
-      // 2. Eksekusi juga via GET no-cors dengan query parameter
-      fetch(actionUrl, {
-        method: 'GET',
-        mode: 'no-cors'
-      }).catch(console.error);
-
+      this.isSettingUp = false;
       return {
         success: true,
         directActionUrl: actionUrl,
         message: 'Permintaan inisialisasi 5 subfolder Google Drive berhasil dikirim ke Google Apps Script.'
       };
     } catch (err: any) {
+      this.isSettingUp = false;
       return {
         success: false,
         directActionUrl: actionUrl,
@@ -753,28 +792,22 @@ class SpreadsheetService {
 // https://drive.google.com/drive/folders/16Ql42x6HBWJIB8ss7abnurS_Kne5HYvh
 //
 // =========================================================================
-// CARA 1 (PALING CEPAT & MUDAH - 1 KLIK):
+// CARA PENGGUNAAN (1 KLIK & DEPLOY WEB APP):
 // 1. Tempelkan seluruh kode ini ke Apps Script.
-// 2. Di toolbar atas (sebelah tombol Debug), pilih fungsi: "inisialisasiFolderGoogleDrive"
-// 3. Klik tombol "▶ Jalankan" (Run).
-// 4. Klik "Review permissions" -> Pilih akun Google -> "Advanced" -> "Go to ... (unsafe)" -> "Allow".
-// 5. SELESAI! Buka Google Drive Anda, 5 subfolder & file status sudah langsung terbuat!
-// =========================================================================
-// CARA 2 (DEPLOY WEB APP UNTUK APLIKASI WEB):
-// 1. Klik tombol biru "Deploy" di pojok kanan atas > "New deployment".
-// 2. Pilih tipe: "Web app".
-// 3. Konfigurasi:
-//    - Description: "Saka Pariwisata Master Database & Drive API v4"
+// 2. Klik "Deploy" (Penerapan) di pojok kanan atas > "New deployment" (Penerapan baru).
+// 3. Pilih tipe: "Web app" (Aplikasi web).
+// 4. Konfigurasi:
+//    - Description: "Saka Pariwisata Master Database & Drive API v4.2"
 //    - Execute as: "Me" (Saya)
 //    - Who has access: "Anyone" (Siapa saja)  <-- WAJIB PILIH "ANYONE"
-// 4. Klik "Deploy", lalu salin URL Web App yang berakhiran "/exec".
-// 5. Tempelkan ke Pengaturan Database di Aplikasi Saka.
+// 5. Klik "Deploy", lalu salin URL Web App yang berakhiran "/exec".
+// 6. Tempelkan ke Pengaturan Database di Aplikasi Saka.
 // =========================================================================
 
 var MASTER_DRIVE_FOLDER_ID = "16Ql42x6HBWJIB8ss7abnurS_Kne5HYvh";
 
 /**
- * FUNGSI UTAMA: Jalankan fungsi ini langsung dari editor Google Apps Script!
+ * FUNGSI UTAMA: Jalankan fungsi ini langsung dari editor Google Apps Script untuk test folder!
  */
 function inisialisasiFolderGoogleDrive() {
   Logger.log("Memulai inisialisasi folder Google Drive: " + MASTER_DRIVE_FOLDER_ID);
@@ -784,19 +817,25 @@ function inisialisasiFolderGoogleDrive() {
   var statusContent = "SISTEM DATABASE & MEDIA SAKA PARIWISATA INDONESIA\\n" +
     "Diperbarui pada: " + new Date().toLocaleString("id-ID", { timeZone: "Asia/Jakarta" }) + " WIB\\n" +
     "Folder Utama: " + rootFolder.getName() + " (ID: " + rootFolder.getId() + ")\\n" +
-    "Status: 5 SUBFOLDER BERHASIL DIBUAT & TERHUBUNG AKTIF\\n\\n" +
-    "Daftar Subfolder:\\n" +
+    "Status: 5 SUBFOLDER BERHASIL DIBUAT & TERHUBUNG AKTIF TANPA DUPLIKASI\\n\\n" +
+    "Daftar Subfolder Resmi:\\n" +
     "1. 01_Pas_Foto_KTA_Anggota\\n" +
     "2. 02_Paket_Wisata\\n" +
     "3. 03_Kuliner_dan_Cinderamata\\n" +
     "4. 04_Agenda_Kegiatan\\n" +
     "5. 05_Dokumen_dan_Surat\\n";
 
+  // Hapus status file lama jika ada agar tidak double file
+  var oldStatus = rootFolder.getFilesByName("STATUS_KONEKSI_SAKA_PARIWISATA.txt");
+  while (oldStatus.hasNext()) {
+    oldStatus.next().setTrashed(true);
+  }
+
   var statusBlob = Utilities.newBlob(statusContent, "text/plain", "STATUS_KONEKSI_SAKA_PARIWISATA.txt");
   var statusFile = rootFolder.createFile(statusBlob);
   statusFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
 
-  Logger.log("✅ SUKSES! 5 Subfolder dan File STATUS_KONEKSI_SAKA_PARIWISATA.txt berhasil dibuat.");
+  Logger.log("✅ SUKSES! 5 Subfolder dan File STATUS_KONEKSI_SAKA_PARIWISATA.txt berhasil diperbarui.");
   return {
     status: "success",
     folderId: rootFolder.getId(),
@@ -879,7 +918,7 @@ function doPost(e) {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var rootFolder = getOrCreateDriveFolder(MASTER_DRIVE_FOLDER_ID);
 
-    // 1. AKSI INISIALISASI STRUKTUR SUBFOLDER DI GOOGLE DRIVE
+    // 1. AKSI INISIALISASI STRUKTUR SUBFOLDER DI GOOGLE DRIVE (TANPA DUPLIKASI)
     if (body.action === "SETUP_DRIVE_FOLDERS" || (e.parameter && e.parameter.action === "SETUP_DRIVE_FOLDERS")) {
       var res = inisialisasiFolderGoogleDrive();
       return ContentService.createTextOutput(JSON.stringify(res)).setMimeType(ContentService.MimeType.JSON);
@@ -897,6 +936,13 @@ function doPost(e) {
 
       var decoded = Utilities.base64Decode(base64Data);
       var filename = body.filename || ("saka_photo_" + Date.now() + ".jpg");
+      
+      // Hapus file lama dengan nama persis sama di folder tujuan agar tidak berlipat ganda
+      var oldFiles = targetSubfolder.getFilesByName(filename);
+      while (oldFiles.hasNext()) {
+        oldFiles.next().setTrashed(true);
+      }
+
       var blob = Utilities.newBlob(decoded, body.mimeType || "image/jpeg", filename);
       var file = targetSubfolder.createFile(blob);
       file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
@@ -913,7 +959,7 @@ function doPost(e) {
       })).setMimeType(ContentService.MimeType.JSON);
     }
 
-    // 3. AKSI BATCH SINKRONISASI SELURUH DATA & OTOMATIS SIMPAN FOTO KE DRIVE (SYNC_ALL_DATA)
+    // 3. AKSI BATCH SINKRONISASI SELURUH DATA & ANTI DATA GANDA (SYNC_ALL_DATA)
     if (body.action === "SYNC_ALL_DATA") {
       var driveSubfolders = setupAllSubfolders(rootFolder);
       var avatarFolder = driveSubfolders["01_Pas_Foto_KTA_Anggota"];
@@ -928,6 +974,13 @@ function doPost(e) {
             var memberNtaOrId = row[1] || row[0] || Date.now();
             var memberName = (row[2] || "Anggota").replace(/[^a-zA-Z0-9]/g, "_");
             var fName = "KTA_" + memberNtaOrId + "_" + memberName + ".jpg";
+            
+            // Hapus file foto lama jika sudah ada
+            var oldAvatar = avatarFolder.getFilesByName(fName);
+            while (oldAvatar.hasNext()) {
+              oldAvatar.next().setTrashed(true);
+            }
+
             var blb = Utilities.newBlob(dec, "image/jpeg", fName);
             var f = avatarFolder.createFile(blb);
             f.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
@@ -939,7 +992,7 @@ function doPost(e) {
         return row;
       });
 
-      // Tulis / Update ke masing-masing Sheet
+      // Tulis / Update (Upsert) ke masing-masing Sheet
       syncSheetData(ss, "Anggota", [
         "ID", "Nomor KTA", "Nama Lengkap", "Email", "Nomor WA", "Provinsi", "Kabupaten/Kota", 
         "Kwarran/Kecamatan", "Gudep", "Krida", "Status", "Foto URL", "Tanggal Daftar", "Link Verifikasi"
@@ -961,7 +1014,7 @@ function doPost(e) {
         "Kontak Narahubung", "Didaftarkan Oleh", "Waktu Diperbarui"
       ], body.activities || []);
 
-      // Buat file rekapitulasi data di Google Drive
+      // Buat file rekapitulasi data di Google Drive (gantikan rekap lama)
       var rekapText = "REKAPITULASI DATABASE SAKA PARIWISATA INDONESIA\\n" +
         "Waktu Sinkronisasi: " + new Date().toLocaleString("id-ID", { timeZone: "Asia/Jakarta" }) + " WIB\\n" +
         "Jumlah Anggota: " + (body.members ? body.members.length : 0) + "\\n" +
@@ -969,16 +1022,21 @@ function doPost(e) {
         "Jumlah Kuliner & Cinderamata: " + (body.culinary ? body.culinary.length : 0) + "\\n" +
         "Jumlah Agenda Kegiatan: " + (body.activities ? body.activities.length : 0) + "\\n";
       
+      var oldRekap = rootFolder.getFilesByName("REKAP_DATABASE_TERBARU.txt");
+      while (oldRekap.hasNext()) {
+        oldRekap.next().setTrashed(true);
+      }
+
       var rekapBlob = Utilities.newBlob(rekapText, "text/plain", "REKAP_DATABASE_TERBARU.txt");
       rootFolder.createFile(rekapBlob);
 
       return ContentService.createTextOutput(JSON.stringify({
         status: "success",
-        message: "Seluruh data dan foto berhasil disinkronkan ke Google Spreadsheet dan Google Drive."
+        message: "Seluruh data dan foto berhasil disinkronkan ke Google Spreadsheet dan Google Drive tanpa duplikasi."
       })).setMimeType(ContentService.MimeType.JSON);
     }
 
-    // 4. AKSI TULIS BARIS TUNGGAL (UPSERT / APPEND)
+    // 4. AKSI TULIS BARIS TUNGGAL DENGAN UPSERT (CEK DUPLIKASI ID & KTA)
     var sheetName = body.sheet || "Anggota";
     var sheet = ss.getSheetByName(sheetName);
     if (!sheet) {
@@ -986,12 +1044,33 @@ function doPost(e) {
     }
 
     if (body.rowData && Array.isArray(body.rowData)) {
-      sheet.appendRow(body.rowData);
+      var rowId = String(body.memberId || body.itemId || body.rowData[0] || "").trim();
+      var rowKta = body.rowData[1] ? String(body.rowData[1]).trim() : "";
+      var dataRange = sheet.getDataRange();
+      var values = dataRange.getValues();
+      var targetRowIndex = -1;
+
+      if (values.length > 1 && (rowId || rowKta)) {
+        for (var r = 1; r < values.length; r++) {
+          var cellId = String(values[r][0] || "").trim();
+          var cellKta = String(values[r][1] || "").trim();
+          if ((rowId && cellId === rowId) || (rowKta && rowKta.length > 5 && cellKta === rowKta)) {
+            targetRowIndex = r + 1; // 1-indexed for Sheet range
+            break;
+          }
+        }
+      }
+
+      if (targetRowIndex > 0) {
+        sheet.getRange(targetRowIndex, 1, 1, body.rowData.length).setValues([body.rowData]);
+      } else {
+        sheet.appendRow(body.rowData);
+      }
     }
 
     return ContentService.createTextOutput(JSON.stringify({
       status: "success",
-      message: "Data berhasil disimpan ke sheet " + sheetName
+      message: "Data berhasil disimpan dan disinkronkan ke sheet " + sheetName
     })).setMimeType(ContentService.MimeType.JSON);
 
   } catch (err) {
@@ -1003,17 +1082,21 @@ function doPost(e) {
 }
 
 function getOrCreateDriveFolder(folderId) {
-  try {
-    var folder = DriveApp.getFolderById(folderId);
-    if (folder) return folder;
-  } catch (err) {
-    Logger.log("Peringatan: Gagal getFolderById(" + folderId + "): " + err.toString());
+  if (folderId && folderId.trim()) {
+    try {
+      var folder = DriveApp.getFolderById(folderId.trim());
+      if (folder && !folder.isTrashed()) return folder;
+    } catch (err) {
+      Logger.log("getFolderById info: " + err.toString());
+    }
   }
 
   var existing = DriveApp.getRootFolder().getFoldersByName("SAKA_PARIWISATA_DATABASE_MEDIA");
-  if (existing.hasNext()) {
-    return existing.next();
+  while (existing.hasNext()) {
+    var f = existing.next();
+    if (!f.isTrashed()) return f;
   }
+
   var newRoot = DriveApp.getRootFolder().createFolder("SAKA_PARIWISATA_DATABASE_MEDIA");
   newRoot.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
   return newRoot;
@@ -1031,14 +1114,22 @@ function setupAllSubfolders(rootFolder) {
   var map = {};
   folderNames.forEach(function(fName) {
     var it = rootFolder.getFoldersByName(fName);
-    var target;
-    if (it.hasNext()) {
-      target = it.next();
-    } else {
-      target = rootFolder.createFolder(fName);
-      target.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    var found = null;
+    while (it.hasNext()) {
+      var f = it.next();
+      if (!f.isTrashed()) {
+        found = f;
+        break;
+      }
     }
-    map[fName] = target;
+
+    if (found) {
+      map[fName] = found;
+    } else {
+      var target = rootFolder.createFolder(fName);
+      target.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+      map[fName] = target;
+    }
   });
 
   return map;
@@ -1052,8 +1143,17 @@ function getCategorySubfolder(rootFolder, category) {
   else if (category === "ACTIVITIES") targetName = "04_Agenda_Kegiatan";
 
   var it = rootFolder.getFoldersByName(targetName);
-  if (it.hasNext()) {
-    return it.next();
+  var found = null;
+  while (it.hasNext()) {
+    var f = it.next();
+    if (!f.isTrashed()) {
+      found = f;
+      break;
+    }
+  }
+
+  if (found) {
+    return found;
   } else {
     var created = rootFolder.createFolder(targetName);
     created.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
@@ -1072,20 +1172,30 @@ function syncSheetData(ss, sheetName, defaultHeaders, rowsData) {
     sheet.appendRow(defaultHeaders);
   }
 
-  // Jika ada data baru untuk disinkronkan
+  // Melakukan Upsert agar data di sheet tidak berlipat ganda
   if (rowsData && rowsData.length > 0) {
     var existingValues = sheet.getDataRange().getValues();
-    var existingIds = {};
+    var idToRowIndex = {};
+
     for (var i = 1; i < existingValues.length; i++) {
-      var rowId = existingValues[i][0];
-      if (rowId) existingIds[rowId] = true;
+      var rowId = String(existingValues[i][0] || "").trim();
+      var rowKta = String(existingValues[i][1] || "").trim();
+      if (rowId) idToRowIndex[rowId] = i + 1;
+      if (rowKta && rowKta.length > 5) idToRowIndex[rowKta] = i + 1;
     }
 
     rowsData.forEach(function(row) {
-      var newId = row[0];
-      if (!existingIds[newId]) {
+      var newId = String(row[0] || "").trim();
+      var newKta = String(row[1] || "").trim();
+      var targetIndex = idToRowIndex[newId] || (newKta && newKta.length > 5 ? idToRowIndex[newKta] : null);
+
+      if (targetIndex) {
+        sheet.getRange(targetIndex, 1, 1, row.length).setValues([row]);
+      } else {
         sheet.appendRow(row);
-        existingIds[newId] = true;
+        var lastRow = sheet.getLastRow();
+        if (newId) idToRowIndex[newId] = lastRow;
+        if (newKta && newKta.length > 5) idToRowIndex[newKta] = lastRow;
       }
     });
   }

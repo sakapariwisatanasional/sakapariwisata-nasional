@@ -87,6 +87,7 @@ export const DEMO_USERS: CurrentUser[] = [
     name: 'Rohadi Wijaya',
     role: 'SUPER_ADMIN',
     jurisdictionName: 'Kwartir Nasional (Semua Wilayah)',
+    memberId: 'mem-nasional-01',
     avatarUrl: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80'
   },
   {
@@ -98,6 +99,7 @@ export const DEMO_USERS: CurrentUser[] = [
     role: 'ADMIN_PROVINCE',
     jurisdictionName: 'Kwarda Jawa Barat',
     jurisdictionId: '32',
+    memberId: 'mem-jabar-01',
     avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80'
   },
   {
@@ -109,6 +111,7 @@ export const DEMO_USERS: CurrentUser[] = [
     role: 'ADMIN_REGENCY',
     jurisdictionName: 'Kwarcab Kabupaten Bandung',
     jurisdictionId: '32.04',
+    memberId: 'mem-jabar-02',
     avatarUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80'
   },
   {
@@ -120,6 +123,7 @@ export const DEMO_USERS: CurrentUser[] = [
     role: 'ADMIN_BRANCH',
     jurisdictionName: 'Kwarran Ciwidey',
     jurisdictionId: 'br-ciwidey-01',
+    memberId: 'mem-jabar-03',
     avatarUrl: 'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=150&auto=format&fit=crop&q=80'
   },
   {

@@ -67,7 +67,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [regDistrictId, setRegDistrictId] = useState('31.71.01');
   const [regGudep, setRegGudep] = useState('04.123 / Pangkalan SMAN 1');
   const [regKrida, setRegKrida] = useState<KridaType>('Krida Pemandu');
-  const [regAvatarUrl, setRegAvatarUrl] = useState('https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&fit=crop&q=80');
+  const [regAvatarUrl, setRegAvatarUrl] = useState('https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&fit=crop&q=80');
   const [regPhotoInputUrl, setRegPhotoInputUrl] = useState('');
   const [isUploadingRegPhoto, setIsUploadingRegPhoto] = useState(false);
   const regFileInputRef = useRef<HTMLInputElement>(null);
@@ -239,8 +239,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       fullName: regFullName.trim(),
       nikMasked: regNik ? `${regNik.substring(0, 4)}********${regNik.slice(-4)}` : '3201********0001',
       avatarUrl: regAvatarUrl || (regGender === 'LAKI_LAKI' 
-        ? 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=400&fit=crop&q=80' 
-        : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&fit=crop&q=80'),
+        ? 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&fit=crop&q=80' 
+        : 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=400&fit=crop&q=80'),
       gender: regGender,
       birthPlace: regBirthPlace,
       birthDate: regBirthDate,

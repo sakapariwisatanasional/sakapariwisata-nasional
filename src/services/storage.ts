@@ -146,6 +146,9 @@ class StorageService {
       ];
       localStorage.setItem(STORAGE_KEYS.NOTIFICATIONS, JSON.stringify(initialNotifs));
     }
+
+    // Jalankan deduplikasi database untuk menjamin integritas data
+    this.deduplicateDatabase();
   }
 
   public subscribe(listener: () => void) {
@@ -544,6 +547,36 @@ class StorageService {
   }
 
   public registerMember(payload: Omit<Member, 'id' | 'status' | 'registeredAt' | 'verificationToken' | 'locationHistory'>): Member {
+    const members = this.getMembers();
+
+    // Pencegahan Data Ganda: Cek apakah data anggota dengan NIK / Email / Nama+No.Telp yang sama sudah ada
+    const existingIdx = members.findIndex(m => {
+      const emailMatch = payload.email && m.email && m.email.toLowerCase().trim() === payload.email.toLowerCase().trim();
+      const nikMatch = payload.nikMasked && !payload.nikMasked.includes('********') && m.nikMasked === payload.nikMasked;
+      const namePhoneMatch = payload.fullName && payload.phone && 
+        m.fullName.toLowerCase().trim() === payload.fullName.toLowerCase().trim() && 
+        m.phone.replace(/[^0-9]/g, '') === payload.phone.replace(/[^0-9]/g, '');
+      return emailMatch || nikMatch || namePhoneMatch;
+    });
+
+    if (existingIdx !== -1) {
+      // Jika sudah ada, perbarui data yang ada tanpa menduplikasi baris database
+      const existing = members[existingIdx];
+      const updated: Member = {
+        ...existing,
+        ...payload,
+        id: existing.id,
+        status: existing.status,
+        registeredAt: existing.registeredAt,
+        verificationToken: existing.verificationToken,
+        locationHistory: existing.locationHistory || []
+      };
+      members[existingIdx] = updated;
+      localStorage.setItem(STORAGE_KEYS.MEMBERS, JSON.stringify(members));
+      this.notify();
+      return updated;
+    }
+
     const newId = `member-${Date.now()}`;
     const token = `VERIFY-SP-${payload.provinceId}${payload.regencyId.replace('.', '')}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
     
@@ -558,7 +591,6 @@ class StorageService {
       certifications: payload.certifications || []
     };
 
-    const members = this.getMembers();
     members.unshift(newMember);
     localStorage.setItem(STORAGE_KEYS.MEMBERS, JSON.stringify(members));
 
@@ -695,6 +727,21 @@ class StorageService {
     if (idx !== -1) {
       members[idx] = member;
       localStorage.setItem(STORAGE_KEYS.MEMBERS, JSON.stringify(members));
+
+      // Synchronize current logged in user if it matches this member
+      const currentUser = this.getCurrentUser();
+      if (
+        currentUser.memberId === member.id ||
+        currentUser.id === member.userId ||
+        currentUser.name.toLowerCase().trim() === member.fullName.toLowerCase().trim() ||
+        (currentUser.email && member.email && currentUser.email.toLowerCase().trim() === member.email.toLowerCase().trim())
+      ) {
+        currentUser.name = member.fullName;
+        if (member.avatarUrl) currentUser.avatarUrl = member.avatarUrl;
+        currentUser.memberId = member.id;
+        localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(currentUser));
+      }
+
       this.notify();
     }
   }
@@ -813,8 +860,14 @@ class StorageService {
 
     // Synchronize current logged in user avatar if it matches this member
     const currentUser = this.getCurrentUser();
-    if (currentUser.memberId === memberId || currentUser.id === member.userId || currentUser.name === member.fullName) {
+    if (
+      currentUser.memberId === memberId || 
+      currentUser.id === member.userId || 
+      currentUser.name.toLowerCase().trim() === member.fullName.toLowerCase().trim() ||
+      (currentUser.email && member.email && currentUser.email.toLowerCase().trim() === member.email.toLowerCase().trim())
+    ) {
       currentUser.avatarUrl = photoUrl;
+      currentUser.memberId = member.id;
       localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(currentUser));
     }
 
@@ -887,6 +940,18 @@ class StorageService {
   }
 
   public createTourPackage(payload: Omit<TourPackage, 'id' | 'slug' | 'submittedAt' | 'viewsCount' | 'status'>): TourPackage {
+    const tours = this.getTourPackages();
+
+    // Pencegahan Data Ganda: Cek jika paket yang sama baru diajukan oleh pemilik yang sama
+    const recentDup = tours.find(t => 
+      t.title.toLowerCase().trim() === payload.title.toLowerCase().trim() &&
+      t.ownerName.toLowerCase().trim() === payload.ownerName.toLowerCase().trim() &&
+      (Date.now() - new Date(t.submittedAt).getTime() < 15000)
+    );
+    if (recentDup) {
+      return recentDup;
+    }
+
     const newId = `tour-${Date.now()}`;
     const slug = (payload.title || 'paket-wisata')
       .toLowerCase()
@@ -903,7 +968,6 @@ class StorageService {
       featured: false
     };
 
-    const tours = this.getTourPackages();
     tours.unshift(newTour);
     localStorage.setItem(STORAGE_KEYS.TOURS, JSON.stringify(tours));
 
@@ -1010,6 +1074,16 @@ class StorageService {
   public addActivity(activityData: Partial<Activity>): Activity {
     const activities = this.getActivities();
     const currentUser = this.getCurrentUser();
+    
+    // Pencegahan Data Ganda: Cek jika agenda kegiatan identik baru dibuat dalam 15 detik terakhir
+    const recentDup = activities.find(a => 
+      a.title.toLowerCase().trim() === (activityData.title || '').toLowerCase().trim() &&
+      a.startDate === activityData.startDate &&
+      (Date.now() - new Date(a.uploadedAt).getTime() < 15000)
+    );
+    if (recentDup) {
+      return recentDup;
+    }
     
     // Strict Scope & Territorial Validation Rules:
     // 1. Only SUPER_ADMIN can create INTERNASIONAL or NASIONAL scale events
@@ -1327,6 +1401,17 @@ class StorageService {
     currentUser: CurrentUser
   ): CulinarySouvenirItem {
     const items = this.getCulinarySouvenirs();
+
+    // Pencegahan Data Ganda: Cek jika produk identik dari kreator yang sama baru ditambahkan dalam 15 detik terakhir
+    const recentDup = items.find(i => 
+      i.name.toLowerCase().trim() === item.name.toLowerCase().trim() &&
+      i.authorMemberId === item.authorMemberId &&
+      (Date.now() - new Date(i.createdAt).getTime() < 15000)
+    );
+    if (recentDup) {
+      return recentDup;
+    }
+
     // Jika Super Admin atau Admin yang membuat, bisa langsung APPROVED, jika Member atau publik, PENDING_APPROVAL
     const isAutoApprove = ['SUPER_ADMIN', 'ADMIN_PROVINCE', 'ADMIN_REGENCY', 'ADMIN_BRANCH'].includes(currentUser.role);
     const status: ProductModerationStatus = item.status || (isAutoApprove ? 'APPROVED' : 'PENDING_APPROVAL');
@@ -1578,6 +1663,148 @@ class StorageService {
       tours: tourCount,
       activities: actCount,
       culinary: culCount
+    };
+  }
+
+  public deduplicateDatabase(): { members: number; tours: number; culinary: number; activities: number } {
+    let removedMembers = 0;
+    let removedTours = 0;
+    let removedCulinary = 0;
+    let removedActivities = 0;
+
+    // 1. Deduplicate Members by ID, KTA, or Email
+    try {
+      const raw = localStorage.getItem(STORAGE_KEYS.MEMBERS);
+      if (raw) {
+        const members: Member[] = JSON.parse(raw);
+        if (Array.isArray(members)) {
+          const seenIds = new Set<string>();
+          const seenKta = new Set<string>();
+          const seenEmails = new Set<string>();
+          const cleanMembers: Member[] = [];
+
+          for (const m of members) {
+            if (!m || !m.id) continue;
+            const kta = m.nationalMemberNumber ? m.nationalMemberNumber.trim() : '';
+            const email = m.email ? m.email.toLowerCase().trim() : '';
+
+            if (seenIds.has(m.id)) {
+              removedMembers++;
+              continue;
+            }
+            if (kta && kta.length > 5 && seenKta.has(kta)) {
+              removedMembers++;
+              continue;
+            }
+            if (email && seenEmails.has(email)) {
+              removedMembers++;
+              continue;
+            }
+
+            seenIds.add(m.id);
+            if (kta && kta.length > 5) seenKta.add(kta);
+            if (email) seenEmails.add(email);
+            cleanMembers.push(m);
+          }
+
+          if (cleanMembers.length !== members.length) {
+            localStorage.setItem(STORAGE_KEYS.MEMBERS, JSON.stringify(cleanMembers));
+          }
+        }
+      }
+    } catch (e) {
+      console.error('Error deduplicating members:', e);
+    }
+
+    // 2. Deduplicate Tour Packages by ID or slug
+    try {
+      const raw = localStorage.getItem(STORAGE_KEYS.TOURS);
+      if (raw) {
+        const tours: TourPackage[] = JSON.parse(raw);
+        if (Array.isArray(tours)) {
+          const seenIds = new Set<string>();
+          const cleanTours: TourPackage[] = [];
+
+          for (const t of tours) {
+            if (!t || !t.id) continue;
+            if (seenIds.has(t.id)) {
+              removedTours++;
+              continue;
+            }
+            seenIds.add(t.id);
+            cleanTours.push(t);
+          }
+
+          if (cleanTours.length !== tours.length) {
+            localStorage.setItem(STORAGE_KEYS.TOURS, JSON.stringify(cleanTours));
+          }
+        }
+      }
+    } catch (e) {
+      console.error('Error deduplicating tours:', e);
+    }
+
+    // 3. Deduplicate Culinary Souvenirs by ID
+    try {
+      const raw = localStorage.getItem(STORAGE_KEYS.CULINARY_SOUVENIRS);
+      if (raw) {
+        const cul: CulinarySouvenirItem[] = JSON.parse(raw);
+        if (Array.isArray(cul)) {
+          const seenIds = new Set<string>();
+          const cleanCul: CulinarySouvenirItem[] = [];
+
+          for (const c of cul) {
+            if (!c || !c.id) continue;
+            if (seenIds.has(c.id)) {
+              removedCulinary++;
+              continue;
+            }
+            seenIds.add(c.id);
+            cleanCul.push(c);
+          }
+
+          if (cleanCul.length !== cul.length) {
+            localStorage.setItem(STORAGE_KEYS.CULINARY_SOUVENIRS, JSON.stringify(cleanCul));
+          }
+        }
+      }
+    } catch (e) {
+      console.error('Error deduplicating culinary:', e);
+    }
+
+    // 4. Deduplicate Activities by ID
+    try {
+      const raw = localStorage.getItem(STORAGE_KEYS.ACTIVITIES);
+      if (raw) {
+        const acts: Activity[] = JSON.parse(raw);
+        if (Array.isArray(acts)) {
+          const seenIds = new Set<string>();
+          const cleanActs: Activity[] = [];
+
+          for (const a of acts) {
+            if (!a || !a.id) continue;
+            if (seenIds.has(a.id)) {
+              removedActivities++;
+              continue;
+            }
+            seenIds.add(a.id);
+            cleanActs.push(a);
+          }
+
+          if (cleanActs.length !== acts.length) {
+            localStorage.setItem(STORAGE_KEYS.ACTIVITIES, JSON.stringify(cleanActs));
+          }
+        }
+      }
+    } catch (e) {
+      console.error('Error deduplicating activities:', e);
+    }
+
+    return {
+      members: removedMembers,
+      tours: removedTours,
+      culinary: removedCulinary,
+      activities: removedActivities
     };
   }
 
