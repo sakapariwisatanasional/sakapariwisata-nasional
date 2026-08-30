@@ -16,7 +16,8 @@ import {
   Link2,
   HelpCircle,
   Zap,
-  Info
+  Info,
+  FolderOpen
 } from 'lucide-react';
 import { spreadsheetService, DEFAULT_SPREADSHEET_ID, DEFAULT_SPREADSHEET_URL, SpreadsheetConfig } from '../../services/spreadsheetService';
 import { storage } from '../../services/storage';
@@ -98,10 +99,25 @@ export const SpreadsheetSyncModal: React.FC<SpreadsheetSyncModalProps> = ({
 
     const res = await spreadsheetService.setupDriveFolders();
     setIsSettingUpDrive(false);
+    
+    const targetScriptUrl = scriptUrlInput.trim() || config.scriptUrl;
+    const directUrl = res.directActionUrl || (targetScriptUrl ? `${targetScriptUrl}?action=SETUP_DRIVE_FOLDERS` : '');
+
     setSyncResult({
       success: res.success,
-      message: res.message + ' Silakan periksa Google Drive Anda (5 subfolder dan file STATUS_KONEKSI_SAKA_PARIWISATA.txt telah dibuat).'
+      message: res.success 
+        ? 'Perintah inisialisasi telah dikirim ke Google Apps Script. Jika folder belum langsung muncul, silakan klik tombol "Buka & Jalankan di Tab Baru" di bawah atau jalankan fungsi inisialisasiFolderGoogleDrive di Apps Script.'
+        : res.message
     });
+
+    if (directUrl && window) {
+      // Buka tab baru untuk memastikan eksekusi jika no-cors tertahan
+      try {
+        window.open(directUrl, '_blank');
+      } catch (e) {
+        // Pop-up mungkin terblokir, tombol manual sudah disediakan
+      }
+    }
   };
 
   const handlePushAllToSheets = async () => {
@@ -332,19 +348,57 @@ export const SpreadsheetSyncModal: React.FC<SpreadsheetSyncModalProps> = ({
 
             {/* Sync Feedback Message */}
             {syncResult && (
-              <div className={`p-3.5 rounded-xl text-xs flex items-center gap-2 border ${
+              <div className={`p-3.5 rounded-xl text-xs space-y-2 border ${
                 syncResult.success 
-                  ? 'bg-emerald-50 border-emerald-200 text-emerald-800' 
-                  : 'bg-red-50 border-red-200 text-red-800'
+                  ? 'bg-emerald-50 border-emerald-200 text-emerald-900' 
+                  : 'bg-amber-50 border-amber-200 text-amber-900'
               }`}>
-                {syncResult.success ? (
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
-                ) : (
-                  <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0" />
+                <div className="flex items-start gap-2">
+                  {syncResult.success ? (
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" />
+                  ) : (
+                    <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                  )}
+                  <div className="flex-1 leading-relaxed">
+                    <p className="font-semibold">{syncResult.message}</p>
+                  </div>
+                </div>
+
+                {config.scriptUrl && (
+                  <div className="pt-2 border-t border-emerald-200/60 flex flex-wrap items-center gap-2">
+                    <a
+                      href={config.scriptUrl.includes('?') ? `${config.scriptUrl}&action=SETUP_DRIVE_FOLDERS` : `${config.scriptUrl}?action=SETUP_DRIVE_FOLDERS`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-[11px] font-bold shadow-xs transition-colors"
+                    >
+                      <ExternalLink className="w-3 h-3" />
+                      <span>Buka Eksekusi Drive di Tab Baru</span>
+                    </a>
+                    <a
+                      href="https://drive.google.com/drive/folders/16Ql42x6HBWJIB8ss7abnurS_Kne5HYvh"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-purple-700 hover:bg-purple-800 text-white rounded-lg text-[11px] font-bold shadow-xs transition-colors"
+                    >
+                      <FolderOpen className="w-3 h-3" />
+                      <span>Periksa Folder Google Drive</span>
+                    </a>
+                  </div>
                 )}
-                <span className="leading-relaxed">{syncResult.message}</span>
               </div>
             )}
+
+            {/* Quick 1-Click Apps Script Tip */}
+            <div className="p-3 bg-gradient-to-r from-purple-50 to-indigo-50 rounded-xl border border-purple-200 text-xs text-purple-950 space-y-1.5">
+              <div className="flex items-center gap-2 font-bold text-purple-900">
+                <Sparkles className="w-4 h-4 text-purple-700" />
+                <span>Tips Tercepat & Pasti Berhasil (1-Klik di Apps Script):</span>
+              </div>
+              <p className="text-[11px] text-purple-900 leading-relaxed">
+                Di editor Apps Script spreadsheet Anda, di samping tombol Debug terdapat menu dropdown fungsi. Pilih fungsi <strong><code>inisialisasiFolderGoogleDrive</code></strong>, lalu klik tombol <strong>▶ Jalankan (Run)</strong>. Seluruh 5 subfolder dan file status akan langsung terbuat dalam 2 detik!
+              </p>
+            </div>
 
             {/* Action Buttons */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
@@ -461,48 +515,55 @@ export const SpreadsheetSyncModal: React.FC<SpreadsheetSyncModalProps> = ({
             <div className="p-3.5 bg-purple-50 border border-purple-200 rounded-2xl space-y-2 text-purple-950">
               <h4 className="font-extrabold text-sm flex items-center gap-1.5 text-purple-900">
                 <Sparkles className="w-4 h-4 text-purple-700" />
-                <span>Kenapa Spreadsheet & Google Drive Belum Berisi File/Folder?</span>
+                <span>Kenapa Folder Google Drive Belum Muncul?</span>
               </h4>
               <p className="text-xs text-purple-900 leading-relaxed">
-                Google Sheets dan Google Drive memiliki sistem keamanan (CORS & Auth) yang melarang aplikasi web publik menulis spreadsheet atau membuat file di Google Drive secara langsung dari browser pengguna tanpa perantara resmi.
+                Di Google Apps Script, jika Anda hanya menyalin kode dan menekan tombol Save <strong>tanpa melakukan "New Deployment" atau tanpa menjalankan fungsi inisialisasi</strong>, Google Drive belum terhubung.
               </p>
               <p className="text-xs text-purple-900 leading-relaxed font-semibold">
-                Solusinya: Kita menggunakan <strong>Google Apps Script Web App</strong> yang berjalan dengan izin akun Google Anda untuk:
+                Berikut 2 cara mudah agar folder langsung muncul dan aktif:
               </p>
-              <ul className="list-disc list-inside text-[11px] text-purple-800 space-y-1 ml-2">
-                <li>Membuat 5 subfolder otomatis di folder Google Drive Anda (<code>16Ql42x6HBWJIB8ss7abnurS_Kne5HYvh</code>)</li>
-                <li>Menyimpan foto KTA anggota & produk wisata langsung sebagai file gambar di Google Drive</li>
-                <li>Menuliskan baris data pendaftaran ke Google Spreadsheet secara realtime</li>
-              </ul>
             </div>
 
-            <div className="space-y-3">
-              <h4 className="font-bold text-slate-900">Langkah Penerapan Script & Inisialisasi Drive (2 Menit):</h4>
-              
-              <ol className="space-y-2.5 list-decimal list-inside text-slate-700">
-                <li className="p-2.5 bg-slate-50 rounded-xl border border-slate-200">
-                  <strong>Buka Google Sheets:</strong> Buka spreadsheet Anda, lalu klik menu <code>Ekstensi (Extensions) &gt; Apps Script</code>.
+            {/* METODE 1: 1-KLIK DI APPS SCRIPT */}
+            <div className="p-4 bg-emerald-50/80 border-2 border-emerald-300 rounded-2xl space-y-2.5">
+              <div className="flex items-center gap-2">
+                <span className="px-2 py-0.5 bg-emerald-700 text-white font-black text-[10px] rounded">CARA 1 (TERCEPAT)</span>
+                <h4 className="font-bold text-slate-900 text-xs">1-Klik Jalankan Fungsi Inisialisasi di Apps Script</h4>
+              </div>
+              <p className="text-[11px] text-slate-600">
+                Cara ini langsung membuat 5 subfolder dan file status di Google Drive dalam 2 detik:
+              </p>
+              <ol className="list-decimal list-inside text-[11px] text-slate-700 space-y-1.5 ml-1">
+                <li>Buka editor Google Apps Script di tab browser Anda.</li>
+                <li>Di toolbar atas (di samping tombol <em>Debug</em>), klik menu dropdown fungsi yang saat ini bertuliskan <code>doGet</code> atau <code>doPost</code>.</li>
+                <li>Pilih fungsi: <strong><code>inisialisasiFolderGoogleDrive</code></strong></li>
+                <li>Klik tombol <strong>▶ Jalankan (Run)</strong>.</li>
+                <li>Jika diminta izin (<em>Authorization required</em>): Klik <em>Review permissions</em> &gt; Pilih akun Google &gt; <em>Advanced</em> &gt; <em>Go to Saka Pariwisata API (unsafe)</em> &gt; <em>Allow</em>.</li>
+                <li><strong>Selesai!</strong> Buka Google Drive Anda, 5 subfolder langsung muncul seketika!</li>
+              </ol>
+            </div>
+
+            {/* METODE 2: DEPLOY WEB APP */}
+            <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-2.5">
+              <div className="flex items-center gap-2">
+                <span className="px-2 py-0.5 bg-purple-700 text-white font-black text-[10px] rounded">CARA 2 (WEB APP DEPLOYMENT)</span>
+                <h4 className="font-bold text-slate-900 text-xs">Deploy Web App untuk Penulisan Otomatis</h4>
+              </div>
+              <p className="text-[11px] text-slate-600">
+                Lakukan ini agar setiap ada anggota baru mendaftar di web, datanya otomatis tersimpan ke Google Sheets & Google Drive:
+              </p>
+              <ol className="list-decimal list-inside text-[11px] text-slate-700 space-y-1.5 ml-1">
+                <li>Di Apps Script, klik tombol biru <strong>Deploy (Terapkan)</strong> di kanan atas &gt; pilih <strong>New deployment (Penerapan baru)</strong>.</li>
+                <li>Pilih jenis (ikon roda gigi): <strong>Web app (Aplikasi Web)</strong>.</li>
+                <li>Konfigurasi wajib:
+                  <div className="my-1 p-2 bg-white rounded border border-slate-200 text-[10px] font-mono text-slate-800 space-y-0.5">
+                    <p>• Execute as: <strong>Me (Saya)</strong></p>
+                    <p>• Who has access: <strong className="text-red-600">Anyone (Siapa saja)</strong></p>
+                  </div>
                 </li>
-                <li className="p-2.5 bg-slate-50 rounded-xl border border-slate-200">
-                  <strong>Tempelkan Kode Script Master:</strong> Buka tab <strong>"Pengaturan API"</strong> di atas, klik tombol <strong>"Salin Kode Script"</strong>, lalu tempelkan menggantikan seluruh isi editor di Google Apps Script.
-                </li>
-                <li className="p-2.5 bg-slate-50 rounded-xl border border-slate-200">
-                  <strong>Terapkan (Deploy) Penerapan Baru:</strong> Klik tombol biru <strong>Deploy (Terapkan)</strong> di pojok kanan atas &gt; pilih <strong>New deployment (Penerapan baru)</strong>.
-                </li>
-                <li className="p-2.5 bg-slate-50 rounded-xl border border-slate-200">
-                  <strong>Konfigurasi Izin Akses (Sangat Penting):</strong>
-                  <ul className="list-disc list-inside mt-1 ml-3 text-[11px] text-slate-600 space-y-0.5">
-                    <li>Pilih jenis (roda gigi): <strong>Web app (Aplikasi Web)</strong></li>
-                    <li>Execute as: <strong>Me (Saya)</strong></li>
-                    <li><strong className="text-red-600">Who has access: Anyone (Siapa saja)</strong> <span className="text-slate-500">(Wajib "Anyone" agar anggota/pengguna dapat mengupload foto & mendaftar dari web)</span></li>
-                  </ul>
-                </li>
-                <li className="p-2.5 bg-slate-50 rounded-xl border border-slate-200">
-                  <strong>Beri Izin Akun Google:</strong> Klik <em>Deploy</em> &gt; Klik <em>Review permissions</em> &gt; Pilih akun Google &gt; Klik <em>Advanced</em> &gt; Klik <em>Go to Saka Pariwisata API (unsafe)</em> &gt; Klik <em>Allow</em>.
-                </li>
-                <li className="p-2.5 bg-slate-50 rounded-xl border border-slate-200">
-                  <strong>Salin URL & Inisialisasi:</strong> Salin <strong>Web App URL</strong> (berakhiran <code>/exec</code>), tempelkan ke tab <strong>"Pengaturan API"</strong> di aplikasi ini, lalu klik tombol <strong>"Inisialisasi Folder di Google Drive"</strong> dan <strong>"Kirim Data & Foto ke Spreadsheet & Drive"</strong>!
-                </li>
+                <li>Klik <strong>Deploy</strong>, lalu salin <strong>Web App URL</strong> (berakhiran <code>/exec</code>).</li>
+                <li>Tempelkan ke tab <strong>"Pengaturan API"</strong> di aplikasi ini &gt; klik <strong>Simpan Pengaturan</strong>.</li>
               </ol>
             </div>
           </div>

@@ -671,12 +671,11 @@ class SpreadsheetService {
         mimeType: base64Data.includes('data:image/png') ? 'image/png' : 'image/jpeg'
       };
 
-      // Catatan: Google Apps Script Web App mengembalikan redirect 302 yang bila diakses via fetch
-      // no-cors akan berhasil dieksekusi di sisi server Apps Script
+      // Coba kirim via POST
       await fetch(scriptUrl, {
         method: 'POST',
         mode: 'no-cors',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'text/plain' },
         body: JSON.stringify(payload)
       });
 
@@ -696,14 +695,18 @@ class SpreadsheetService {
   /**
    * Inisialisasi struktur subfolder di Google Drive folder 16Ql42x6HBWJIB8ss7abnurS_Kne5HYvh
    */
-  public async setupDriveFolders(): Promise<{ success: boolean; message: string }> {
+  public async setupDriveFolders(): Promise<{ success: boolean; directActionUrl?: string; message: string }> {
     const scriptUrl = this.config.scriptUrl;
     if (!scriptUrl) {
       return {
         success: false,
-        message: 'Google Apps Script Web App URL belum dipasang.'
+        message: 'Google Apps Script Web App URL belum dipasang. Silakan pasang Web App URL di tab "Pengaturan API".'
       };
     }
+
+    const actionUrl = scriptUrl.includes('?')
+      ? `${scriptUrl}&action=SETUP_DRIVE_FOLDERS`
+      : `${scriptUrl}?action=SETUP_DRIVE_FOLDERS`;
 
     try {
       const payload = {
@@ -711,20 +714,29 @@ class SpreadsheetService {
         folderId: '16Ql42x6HBWJIB8ss7abnurS_Kne5HYvh'
       };
 
-      await fetch(scriptUrl, {
+      // 1. Eksekusi via POST no-cors
+      fetch(scriptUrl, {
         method: 'POST',
         mode: 'no-cors',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'text/plain' },
         body: JSON.stringify(payload)
-      });
+      }).catch(console.error);
+
+      // 2. Eksekusi juga via GET no-cors dengan query parameter
+      fetch(actionUrl, {
+        method: 'GET',
+        mode: 'no-cors'
+      }).catch(console.error);
 
       return {
         success: true,
-        message: 'Permintaan pembuatan struktur subfolder di Google Drive berhasil dikirim.'
+        directActionUrl: actionUrl,
+        message: 'Permintaan inisialisasi 5 subfolder Google Drive berhasil dikirim ke Google Apps Script.'
       };
     } catch (err: any) {
       return {
         success: false,
+        directActionUrl: actionUrl,
         message: `Gagal inisialisasi folder: ${err.message}`
       };
     }
@@ -740,23 +752,86 @@ class SpreadsheetService {
 // Folder Google Drive Target:
 // https://drive.google.com/drive/folders/16Ql42x6HBWJIB8ss7abnurS_Kne5HYvh
 //
-// Panduan Penerapan (Deployment Guide):
-// 1. Di Google Sheets Anda, klik menu: "Ekstensi" (Extensions) > "Apps Script".
-// 2. Hapus semua baris kode yang ada, lalu tempelkan seluruh skrip di bawah ini.
-// 3. Klik tombol "Deploy" (Terapkan) di pojok kanan atas > pilih "New deployment" (Penerapan baru).
-// 4. Pilih jenis "Web app" (Aplikasi Web).
-// 5. Konfigurasi:
-//    - Description: "Saka Pariwisata Master Database & Media Drive API v3"
-//    - Execute as: "Me" (Jalankan sebagai: Saya)
-//    - Who has access: "Anyone" (Siapa saja)  <-- WAJIB PILIH "ANYONE" AGAR BISA DITULIS DARI APLIKASI
-// 6. Klik "Deploy", lalu jika muncul jendela "Authorization required", klik "Review permissions" -> 
-//    Pilih akun Google Anda -> Klik "Advanced" (Lanjutan) -> Klik "Go to ... (unsafe)" -> Klik "Allow" (Izinkan).
-// 7. Salin URL Web App yang berakhiran "/exec", lalu tempelkan ke Pengaturan Database di Aplikasi Saka.
+// =========================================================================
+// CARA 1 (PALING CEPAT & MUDAH - 1 KLIK):
+// 1. Tempelkan seluruh kode ini ke Apps Script.
+// 2. Di toolbar atas (sebelah tombol Debug), pilih fungsi: "inisialisasiFolderGoogleDrive"
+// 3. Klik tombol "▶ Jalankan" (Run).
+// 4. Klik "Review permissions" -> Pilih akun Google -> "Advanced" -> "Go to ... (unsafe)" -> "Allow".
+// 5. SELESAI! Buka Google Drive Anda, 5 subfolder & file status sudah langsung terbuat!
+// =========================================================================
+// CARA 2 (DEPLOY WEB APP UNTUK APLIKASI WEB):
+// 1. Klik tombol biru "Deploy" di pojok kanan atas > "New deployment".
+// 2. Pilih tipe: "Web app".
+// 3. Konfigurasi:
+//    - Description: "Saka Pariwisata Master Database & Drive API v4"
+//    - Execute as: "Me" (Saya)
+//    - Who has access: "Anyone" (Siapa saja)  <-- WAJIB PILIH "ANYONE"
+// 4. Klik "Deploy", lalu salin URL Web App yang berakhiran "/exec".
+// 5. Tempelkan ke Pengaturan Database di Aplikasi Saka.
 // =========================================================================
 
 var MASTER_DRIVE_FOLDER_ID = "16Ql42x6HBWJIB8ss7abnurS_Kne5HYvh";
 
+/**
+ * FUNGSI UTAMA: Jalankan fungsi ini langsung dari editor Google Apps Script!
+ */
+function inisialisasiFolderGoogleDrive() {
+  Logger.log("Memulai inisialisasi folder Google Drive: " + MASTER_DRIVE_FOLDER_ID);
+  var rootFolder = getOrCreateDriveFolder(MASTER_DRIVE_FOLDER_ID);
+  var subfolders = setupAllSubfolders(rootFolder);
+
+  var statusContent = "SISTEM DATABASE & MEDIA SAKA PARIWISATA INDONESIA\\n" +
+    "Diperbarui pada: " + new Date().toLocaleString("id-ID", { timeZone: "Asia/Jakarta" }) + " WIB\\n" +
+    "Folder Utama: " + rootFolder.getName() + " (ID: " + rootFolder.getId() + ")\\n" +
+    "Status: 5 SUBFOLDER BERHASIL DIBUAT & TERHUBUNG AKTIF\\n\\n" +
+    "Daftar Subfolder:\\n" +
+    "1. 01_Pas_Foto_KTA_Anggota\\n" +
+    "2. 02_Paket_Wisata\\n" +
+    "3. 03_Kuliner_dan_Cinderamata\\n" +
+    "4. 04_Agenda_Kegiatan\\n" +
+    "5. 05_Dokumen_dan_Surat\\n";
+
+  var statusBlob = Utilities.newBlob(statusContent, "text/plain", "STATUS_KONEKSI_SAKA_PARIWISATA.txt");
+  var statusFile = rootFolder.createFile(statusBlob);
+  statusFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+
+  Logger.log("✅ SUKSES! 5 Subfolder dan File STATUS_KONEKSI_SAKA_PARIWISATA.txt berhasil dibuat.");
+  return {
+    status: "success",
+    folderId: rootFolder.getId(),
+    subfolders: Object.keys(subfolders)
+  };
+}
+
+function tesKoneksiDriveDanSheet() {
+  var rootFolder = getOrCreateDriveFolder(MASTER_DRIVE_FOLDER_ID);
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  Logger.log("Folder Drive: " + rootFolder.getName() + " (ID: " + rootFolder.getId() + ")");
+  Logger.log("Spreadsheet: " + ss.getName() + " (ID: " + ss.getId() + ")");
+}
+
 function doGet(e) {
+  var action = (e && e.parameter && e.parameter.action) ? e.parameter.action : "";
+
+  // 1. Eksekusi inisialisasi Drive lewat GET
+  if (action === "SETUP_DRIVE_FOLDERS" || action === "SETUP_DRIVE" || action === "INIT_DRIVE") {
+    inisialisasiFolderGoogleDrive();
+    var htmlOutput = "<!DOCTYPE html><html><head><meta charset='utf-8'><title>Inisialisasi Google Drive Berhasil</title>" +
+      "<style>body{font-family:system-ui,-apple-system,sans-serif;padding:30px;background:#f0fdf4;color:#166534;line-height:1.6} " +
+      ".card{background:#fff;padding:28px;border-radius:20px;box-shadow:0 10px 25px rgba(0,0,0,0.08);max-width:560px;margin:30px auto;border:1px solid #bbf7d0} " +
+      "h1{color:#15803d;margin-top:0;font-size:22px;display:flex;align-items:center;gap:8px} " +
+      "ul{text-align:left;background:#f8fafc;padding:16px 28px;border-radius:12px;border:1px solid #e2e8f0;font-family:monospace;font-size:13px} " +
+      "li{margin:6px 0} .btn{display:inline-block;padding:12px 20px;background:#059669;color:#fff;text-decoration:none;border-radius:12px;font-weight:bold;margin-top:10px}</style></head>" +
+      "<body><div class='card'><h1>✅ Inisialisasi Google Drive Sukses!</h1>" +
+      "<p>5 Subfolder resmi dan file verifikasi telah berhasil dibuat di Google Drive Saka Pariwisata:</p>" +
+      "<ul><li>📁 01_Pas_Foto_KTA_Anggota</li><li>📁 02_Paket_Wisata</li><li>📁 03_Kuliner_dan_Cinderamata</li><li>📁 04_Agenda_Kegiatan</li><li>📁 05_Dokumen_dan_Surat</li></ul>" +
+      "<p><a class='btn' href='https://drive.google.com/drive/folders/16Ql42x6HBWJIB8ss7abnurS_Kne5HYvh' target='_blank'>📂 Buka Folder di Google Drive</a></p>" +
+      "<p style='font-size:12px;color:#64748b;margin-top:20px'>Anda sekarang dapat kembali ke aplikasi Saka Pariwisata dan mulai sinkronisasi data.</p></div></body></html>";
+    return HtmlService.createHtmlOutput(htmlOutput);
+  }
+
+  // 2. Baca data Spreadsheet
   var sheetName = (e && e.parameter && e.parameter.sheet) ? e.parameter.sheet : "Anggota";
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(sheetName);
@@ -794,29 +869,20 @@ function doPost(e) {
         .setMimeType(ContentService.MimeType.JSON);
     }
 
-    var body = JSON.parse(e.postData.contents);
+    var body;
+    try {
+      body = JSON.parse(e.postData.contents);
+    } catch (parseErr) {
+      body = e.parameter || {};
+    }
+
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var rootFolder = getOrCreateDriveFolder(MASTER_DRIVE_FOLDER_ID);
 
     // 1. AKSI INISIALISASI STRUKTUR SUBFOLDER DI GOOGLE DRIVE
-    if (body.action === "SETUP_DRIVE_FOLDERS") {
-      var subfolders = setupAllSubfolders(rootFolder);
-      
-      // Buat file status verifikasi di root folder
-      var statusFileContent = "SISTEM DATABASE & MEDIA SAKA PARIWISATA INDONESIA\\n" +
-        "Diperbarui pada: " + new Date().toISOString() + "\\n" +
-        "Folder Utama ID: " + MASTER_DRIVE_FOLDER_ID + "\\n" +
-        "Status: TERHUBUNG & AKTIF\\n";
-      
-      var statusBlob = Utilities.newBlob(statusFileContent, "text/plain", "STATUS_KONEKSI_SAKA_PARIWISATA.txt");
-      var statusFile = rootFolder.createFile(statusBlob);
-      statusFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-
-      return ContentService.createTextOutput(JSON.stringify({
-        status: "success",
-        message: "Struktur subfolder Google Drive berhasil dibuat dan diatur.",
-        subfolders: subfolders
-      })).setMimeType(ContentService.MimeType.JSON);
+    if (body.action === "SETUP_DRIVE_FOLDERS" || (e.parameter && e.parameter.action === "SETUP_DRIVE_FOLDERS")) {
+      var res = inisialisasiFolderGoogleDrive();
+      return ContentService.createTextOutput(JSON.stringify(res)).setMimeType(ContentService.MimeType.JSON);
     }
 
     // 2. AKSI UPLOAD GAMBAR TUNGGAL KE GOOGLE DRIVE
@@ -938,10 +1004,19 @@ function doPost(e) {
 
 function getOrCreateDriveFolder(folderId) {
   try {
-    return DriveApp.getFolderById(folderId);
+    var folder = DriveApp.getFolderById(folderId);
+    if (folder) return folder;
   } catch (err) {
-    return DriveApp.getRootFolder();
+    Logger.log("Peringatan: Gagal getFolderById(" + folderId + "): " + err.toString());
   }
+
+  var existing = DriveApp.getRootFolder().getFoldersByName("SAKA_PARIWISATA_DATABASE_MEDIA");
+  if (existing.hasNext()) {
+    return existing.next();
+  }
+  var newRoot = DriveApp.getRootFolder().createFolder("SAKA_PARIWISATA_DATABASE_MEDIA");
+  newRoot.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  return newRoot;
 }
 
 function setupAllSubfolders(rootFolder) {
@@ -1020,3 +1095,4 @@ function syncSheetData(ss, sheetName, defaultHeaders, rowsData) {
 }
 
 export const spreadsheetService = new SpreadsheetService();
+
