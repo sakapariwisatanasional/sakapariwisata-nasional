@@ -422,11 +422,40 @@ class StorageService {
   public getMembers(): Member[] {
     try {
       const data = localStorage.getItem(STORAGE_KEYS.MEMBERS);
-      const parsed = data ? JSON.parse(data) : [];
-      return Array.isArray(parsed) && parsed.length > 0 ? parsed : INITIAL_MEMBERS;
+      const parsed: Member[] = data ? JSON.parse(data) : [];
+      
+      // Combine stored members with INITIAL_MEMBERS to guarantee all showcase & national executive records exist
+      const memberMap = new Map<string, Member>();
+      INITIAL_MEMBERS.forEach(m => memberMap.set(m.id, m));
+      if (Array.isArray(parsed)) {
+        parsed.forEach(m => {
+          if (m && m.id) {
+            memberMap.set(m.id, m);
+          }
+        });
+      }
+      return Array.from(memberMap.values());
     } catch {
       return INITIAL_MEMBERS;
     }
+  }
+
+  public addOrUpdateMember(member: Member): Member {
+    const members = this.getMembers();
+    const idx = members.findIndex(m => 
+      m.id === member.id || 
+      (m.nationalMemberNumber && member.nationalMemberNumber && m.nationalMemberNumber === member.nationalMemberNumber)
+    );
+
+    if (idx !== -1) {
+      members[idx] = { ...members[idx], ...member };
+    } else {
+      members.unshift(member);
+    }
+
+    localStorage.setItem(STORAGE_KEYS.MEMBERS, JSON.stringify(members));
+    this.notify();
+    return member;
   }
 
   public getMemberById(id: string): Member | undefined {

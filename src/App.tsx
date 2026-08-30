@@ -12,6 +12,7 @@ import {
 import { storage } from './services/storage';
 import { DEMO_USERS } from './data/initialData';
 import { spreadsheetService } from './services/spreadsheetService';
+import { verifyMemberUniversal } from './services/ktaVerificationService';
 
 // Layout Components
 import { Sidebar } from './components/layout/Sidebar';
@@ -128,16 +129,13 @@ export default function App() {
       }
 
       if (verifyId) {
-        const cleanId = verifyId.trim().toLowerCase();
-        const allMembers = storage.getMembers();
-        const found = allMembers.find(m => 
-          (m.nationalMemberNumber && m.nationalMemberNumber.toLowerCase() === cleanId) ||
-          (m.verificationToken && m.verificationToken.toLowerCase() === cleanId) ||
-          m.id.toLowerCase() === cleanId
-        );
-        if (found) {
-          setVerifyingMember(found);
-        }
+        verifyMemberUniversal(verifyId).then(res => {
+          if (res.found && res.member) {
+            setVerifyingMember(res.member);
+          }
+        }).catch(err => {
+          console.warn('Auto URL verification failed:', err);
+        });
       }
     } catch (e) {
       console.warn('URL param parsing error', e);

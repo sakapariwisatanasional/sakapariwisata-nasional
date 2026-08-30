@@ -20,7 +20,11 @@ import {
   BadgeCheck,
   ChevronRight,
   BookOpen,
-  Send
+  Send,
+  Camera,
+  ScanLine,
+  RefreshCw,
+  Database
 } from 'lucide-react';
 import { Member, TourPackage, Skill } from '../types';
 import { TourPackageCard } from '../components/tourism/TourPackageCard';
@@ -28,6 +32,8 @@ import { SakaLogo } from '../components/common/SakaLogo';
 import { MASTER_SKILLS } from '../data/initialData';
 import { IntegratedTourismShowcaseGallery } from '../components/dashboard/IntegratedTourismShowcaseGallery';
 import { storage } from '../services/storage';
+import { verifyMemberUniversal, VerificationResult, normalizeNtaQuery } from '../services/ktaVerificationService';
+import { KtaBarcodeScannerModal } from '../components/member/KtaBarcodeScannerModal';
 
 interface PublicPortalViewProps {
   members: Member[];
@@ -51,7 +57,11 @@ export const PublicPortalView: React.FC<PublicPortalViewProps> = ({
   // --- Verification State ---
   const [verifyInput, setVerifyInput] = useState('');
   const [searchedMember, setSearchedMember] = useState<Member | null>(null);
+  const [verificationMeta, setVerificationMeta] = useState<VerificationResult | null>(null);
   const [notFound, setNotFound] = useState(false);
+  const [notFoundMessage, setNotFoundMessage] = useState<string>('');
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
 
   // --- Tour Packages State ---
   const [tourCategoryFilter, setTourCategoryFilter] = useState<string>('ALL');
@@ -62,27 +72,48 @@ export const PublicPortalView: React.FC<PublicPortalViewProps> = ({
   const [talentCategoryFilter, setTalentCategoryFilter] = useState<string>('ALL');
   const [talentSkillFilter, setTalentSkillFilter] = useState<string>('ALL');
 
+  // Perform universal verification
+  const executeVerification = async (termToVerify: string) => {
+    const term = termToVerify.trim();
+    if (!term) return;
+
+    setIsVerifying(true);
+    setNotFound(false);
+    setNotFoundMessage('');
+    setSearchedMember(null);
+    setVerificationMeta(null);
+
+    try {
+      const result = await verifyMemberUniversal(term, members);
+      setIsVerifying(false);
+      setVerificationMeta(result);
+
+      if (result.found && result.member) {
+        setSearchedMember(result.member);
+        setNotFound(false);
+      } else {
+        setSearchedMember(null);
+        setNotFound(true);
+        setNotFoundMessage(
+          result.message || 'Nomor Anggota Tidak Ditemukan. Pastikan nomor anggota yang dimasukkan benar dan sesuai dengan format resmi Kwartir.'
+        );
+      }
+    } catch (e: any) {
+      setIsVerifying(false);
+      setNotFound(true);
+      setNotFoundMessage('Terjadi kesalahan saat memverifikasi data anggota.');
+    }
+  };
+
   // Auto-check URL parameters on mount
   useEffect(() => {
     try {
       const urlParams = new URLSearchParams(window.location.search);
-      const urlVerifyId = urlParams.get('verifyId') || urlParams.get('nta') || urlParams.get('id');
+      const urlVerifyId = urlParams.get('verifyId') || urlParams.get('nta') || urlParams.get('id') || urlParams.get('kta');
       if (urlVerifyId) {
         const term = urlVerifyId.trim();
         setVerifyInput(term);
-        const termLower = term.toLowerCase();
-        const found = members.find(m => 
-          (m.nationalMemberNumber && m.nationalMemberNumber.toLowerCase() === termLower) ||
-          (m.verificationToken && m.verificationToken.toLowerCase() === termLower) ||
-          (m.id && m.id.toLowerCase() === termLower) ||
-          (m.fullName && m.fullName.toLowerCase() === termLower)
-        );
-        if (found) {
-          setSearchedMember(found);
-          setNotFound(false);
-        } else {
-          setNotFound(true);
-        }
+        executeVerification(term);
       }
     } catch (e) {
       console.warn('URL verify param error', e);
@@ -92,24 +123,7 @@ export const PublicPortalView: React.FC<PublicPortalViewProps> = ({
   // Verify Handler
   const handleVerify = (e: React.FormEvent) => {
     e.preventDefault();
-    setNotFound(false);
-    setSearchedMember(null);
-
-    const term = verifyInput.trim().toLowerCase();
-    if (!term) return;
-
-    const found = members.find(m => 
-      (m.nationalMemberNumber && m.nationalMemberNumber.toLowerCase() === term) ||
-      (m.verificationToken && m.verificationToken.toLowerCase() === term) ||
-      (m.id && m.id.toLowerCase() === term) ||
-      (m.fullName && m.fullName.toLowerCase() === term)
-    );
-
-    if (found) {
-      setSearchedMember(found);
-    } else {
-      setNotFound(true);
-    }
+    executeVerification(verifyInput);
   };
 
   // Filtered Tours
@@ -603,39 +617,76 @@ export const PublicPortalView: React.FC<PublicPortalViewProps> = ({
             </p>
 
             {/* Search Input Form */}
-            <form onSubmit={handleVerify} className="pt-2 flex flex-col sm:flex-row gap-2 max-w-lg mx-auto">
-              <div className="flex-1 bg-white/10 backdrop-blur-md rounded-2xl border border-white/20 px-4 py-3 flex items-center gap-3 text-white focus-within:bg-white/20 focus-within:border-purple-400 transition-all">
-                <QrCode className="w-5 h-5 text-purple-300 flex-shrink-0" />
-                <input
-                  type="text"
-                  value={verifyInput}
-                  onChange={(e) => setVerifyInput(e.target.value)}
-                  placeholder="Ketik Nomor Anggota / Token..."
-                  className="bg-transparent outline-none w-full text-xs sm:text-sm placeholder:text-purple-200/50 font-mono"
-                />
+            <div className="pt-2 max-w-lg mx-auto space-y-2">
+              <form onSubmit={handleVerify} className="flex flex-col sm:flex-row gap-2">
+                <div className="flex-1 bg-white/10 backdrop-blur-md rounded-2xl border border-white/20 px-4 py-3 flex items-center gap-3 text-white focus-within:bg-white/20 focus-within:border-purple-400 transition-all">
+                  <QrCode className="w-5 h-5 text-purple-300 flex-shrink-0" />
+                  <input
+                    type="text"
+                    value={verifyInput}
+                    onChange={(e) => setVerifyInput(e.target.value)}
+                    placeholder="Ketik Nomor Anggota / NTA / Token..."
+                    className="bg-transparent outline-none w-full text-xs sm:text-sm placeholder:text-purple-200/50 font-mono text-white"
+                  />
+                  {verifyInput && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setVerifyInput('');
+                        setSearchedMember(null);
+                        setNotFound(false);
+                      }}
+                      className="text-purple-300 hover:text-white text-xs font-bold px-1"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+                <button
+                  type="submit"
+                  disabled={isVerifying}
+                  className="px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-500 hover:from-purple-500 hover:to-indigo-400 disabled:opacity-50 text-white font-extrabold rounded-2xl text-xs sm:text-sm shadow-lg shadow-purple-950 transition-all cursor-pointer flex items-center justify-center gap-2"
+                >
+                  {isVerifying ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      <span>Memeriksa...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Search className="w-4 h-4" />
+                      <span>Verifikasi</span>
+                    </>
+                  )}
+                </button>
+              </form>
+
+              {/* Camera Scanner Button */}
+              <div className="flex items-center justify-center">
+                <button
+                  type="button"
+                  onClick={() => setIsScannerOpen(true)}
+                  className="w-full sm:w-auto px-4 py-2 bg-purple-500/20 hover:bg-purple-500/30 border border-purple-400/40 rounded-xl text-purple-200 hover:text-white text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xs"
+                >
+                  <Camera className="w-4 h-4 text-emerald-400" />
+                  <span>📷 Pindai Kamera Barcode / QR Code KTA</span>
+                </button>
               </div>
-              <button
-                type="submit"
-                className="px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-500 hover:from-purple-500 hover:to-indigo-400 text-white font-extrabold rounded-2xl text-xs sm:text-sm shadow-lg shadow-purple-950 transition-all cursor-pointer flex items-center justify-center gap-2"
-              >
-                <Search className="w-4 h-4" />
-                <span>Verifikasi</span>
-              </button>
-            </form>
+            </div>
 
             {/* Quick Demo Autofill Suggestions */}
             <div className="pt-2 flex flex-wrap items-center justify-center gap-2 text-[11px] text-purple-200/60">
               <span>Coba cepat:</span>
-              {members.slice(0, 3).map((m) => (
+              {members.slice(0, 4).map((m) => (
                 <button
                   key={m.id}
                   type="button"
                   onClick={() => {
-                    setVerifyInput(m.nationalMemberNumber || m.verificationToken || '');
-                    setSearchedMember(m);
-                    setNotFound(false);
+                    const term = m.nationalMemberNumber || m.verificationToken || m.id;
+                    setVerifyInput(term);
+                    executeVerification(term);
                   }}
-                  className="font-mono text-purple-200 hover:underline bg-purple-950/80 px-2 py-0.5 rounded border border-purple-800 text-[10px]"
+                  className="font-mono text-purple-200 hover:underline bg-purple-950/80 px-2 py-0.5 rounded border border-purple-800 text-[10px] cursor-pointer"
                 >
                   {m.nationalMemberNumber} ({m.fullName.split(' ')[0]})
                 </button>
@@ -643,17 +694,38 @@ export const PublicPortalView: React.FC<PublicPortalViewProps> = ({
             </div>
           </div>
 
+          {/* Loading Indicator */}
+          {isVerifying && (
+            <div className="p-6 bg-purple-900/40 border border-purple-500/40 rounded-3xl max-w-md mx-auto text-center space-y-2 text-white">
+              <RefreshCw className="w-8 h-8 text-purple-300 animate-spin mx-auto" />
+              <p className="font-bold text-sm text-purple-200">
+                Memverifikasi Data KTA...
+              </p>
+              <p className="text-xs text-purple-300/80">
+                Mengecek kecocokan di database lokal dan Google Spreadsheet
+              </p>
+            </div>
+          )}
+
           {/* Verification Result Card */}
-          {searchedMember && (
+          {searchedMember && !isVerifying && (
             <div className="bg-white rounded-3xl p-6 sm:p-8 border-2 border-emerald-500 text-slate-900 shadow-2xl max-w-2xl mx-auto space-y-5 animate-in fade-in slide-in-from-bottom-3 duration-200">
-              <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+              <div className="flex items-center justify-between pb-4 border-b border-slate-100 flex-wrap gap-2">
                 <div className="flex items-center gap-2 text-emerald-800 font-bold text-xs sm:text-sm">
-                  <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                  <CheckCircle2 className="w-5 h-5 text-emerald-600 flex-shrink-0" />
                   <span>DATA ANGGOTA VALID & RESMI TERDAFTAR</span>
                 </div>
-                <span className="px-2.5 py-1 bg-emerald-100 text-emerald-900 font-extrabold text-[10px] rounded-full border border-emerald-200">
-                  KTA AKTIF
-                </span>
+                <div className="flex items-center gap-1.5">
+                  {verificationMeta?.source === 'GOOGLE_SPREADSHEET' && (
+                    <span className="px-2.5 py-1 bg-blue-100 text-blue-900 font-extrabold text-[10px] rounded-full border border-blue-200 flex items-center gap-1">
+                      <Database className="w-3 h-3" />
+                      GOOGLE SHEETS
+                    </span>
+                  )}
+                  <span className="px-2.5 py-1 bg-emerald-100 text-emerald-900 font-extrabold text-[10px] rounded-full border border-emerald-200">
+                    KTA AKTIF
+                  </span>
+                </div>
               </div>
 
               <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5">
@@ -697,13 +769,23 @@ export const PublicPortalView: React.FC<PublicPortalViewProps> = ({
             </div>
           )}
 
-          {notFound && (
-            <div className="bg-rose-50 rounded-3xl p-6 border border-rose-200 text-center max-w-md mx-auto space-y-2 text-slate-900">
+          {notFound && !isVerifying && (
+            <div className="bg-rose-50 rounded-3xl p-6 border border-rose-200 text-center max-w-md mx-auto space-y-2 text-slate-900 animate-in fade-in duration-200">
               <AlertCircle className="w-8 h-8 text-rose-600 mx-auto" />
               <h4 className="font-bold text-rose-900 text-sm">Nomor Anggota Tidak Ditemukan</h4>
-              <p className="text-xs text-rose-700">
-                Pastikan nomor anggota yang dimasukkan benar dan sesuai dengan format resmi Kwartir.
+              <p className="text-xs text-rose-700 leading-relaxed">
+                {notFoundMessage || 'Pastikan nomor anggota yang dimasukkan benar dan sesuai dengan format resmi Kwartir.'}
               </p>
+              <div className="pt-2 flex flex-wrap justify-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsScannerOpen(true)}
+                  className="px-3 py-1.5 bg-rose-200/80 hover:bg-rose-200 text-rose-900 rounded-lg text-[11px] font-bold transition-colors flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Camera className="w-3.5 h-3.5" />
+                  <span>Coba Pindai Barcode / QR dengan Kamera</span>
+                </button>
+              </div>
             </div>
           )}
         </div>
@@ -752,6 +834,24 @@ export const PublicPortalView: React.FC<PublicPortalViewProps> = ({
           </div>
         </div>
       </section>
+
+      {/* KTA Barcode & QR Scanner Modal */}
+      <KtaBarcodeScannerModal
+        isOpen={isScannerOpen}
+        onClose={() => setIsScannerOpen(false)}
+        localMembers={members}
+        onScanSuccess={(scannedMember, result) => {
+          setSearchedMember(scannedMember);
+          setVerificationMeta(result);
+          setVerifyInput(scannedMember.nationalMemberNumber || scannedMember.verificationToken || scannedMember.id);
+          setNotFound(false);
+          // Scroll to verification card
+          const el = document.getElementById('verifikasi-kta');
+          if (el) {
+            el.scrollIntoView({ behavior: 'smooth' });
+          }
+        }}
+      />
     </div>
   );
 };
