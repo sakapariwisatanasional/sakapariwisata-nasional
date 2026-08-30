@@ -353,7 +353,6 @@ class SpreadsheetService {
     const scriptUrl = this.config.scriptUrl;
 
     if (!scriptUrl) {
-      // Jika Apps Script belum disetel, simpan ke lokal dan sediakan format ekspor
       return {
         success: true,
         message: 'Data tersimpan di database lokal. Untuk sinkronisasi otomatis ke Google Spreadsheet, masukkan Web App URL di Pengaturan Database.'
@@ -362,7 +361,9 @@ class SpreadsheetService {
 
     try {
       const payload = {
+        action: 'UPSERT_MEMBER',
         sheet: 'Anggota',
+        memberId: member.id,
         rowData: [
           member.id,
           member.nationalMemberNumber || '',
@@ -381,9 +382,9 @@ class SpreadsheetService {
         ]
       };
 
-      const response = await fetch(scriptUrl, {
+      await fetch(scriptUrl, {
         method: 'POST',
-        mode: 'no-cors', // Apps Script web app standard CORS bypass
+        mode: 'no-cors',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
@@ -402,20 +403,267 @@ class SpreadsheetService {
   }
 
   /**
+   * Kirim data paket wisata ke Google Spreadsheet
+   */
+  public async appendTourToSpreadsheet(tour: TourPackage): Promise<{ success: boolean; message: string }> {
+    const scriptUrl = this.config.scriptUrl;
+    if (!scriptUrl) return { success: true, message: 'Tersimpan secara lokal.' };
+
+    try {
+      const payload = {
+        action: 'UPSERT_TOUR',
+        sheet: 'Paket_Wisata',
+        itemId: tour.id,
+        rowData: [
+          tour.id,
+          tour.title,
+          tour.category,
+          tour.pricePerPerson,
+          tour.durationDays,
+          tour.locationAddress,
+          tour.provinceName,
+          tour.regencyName,
+          tour.ownerName,
+          tour.contactPhone,
+          tour.coverImage || '',
+          new Date().toISOString()
+        ]
+      };
+
+      await fetch(scriptUrl, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      return { success: true, message: 'Paket wisata terkirim ke spreadsheet.' };
+    } catch (e: any) {
+      return { success: false, message: e.message };
+    }
+  }
+
+  /**
+   * Kirim data produk kuliner & cinderamata ke Google Spreadsheet
+   */
+  public async appendCulinaryToSpreadsheet(item: CulinarySouvenirItem): Promise<{ success: boolean; message: string }> {
+    const scriptUrl = this.config.scriptUrl;
+    if (!scriptUrl) return { success: true, message: 'Tersimpan secara lokal.' };
+
+    try {
+      const payload = {
+        action: 'UPSERT_CULINARY',
+        sheet: 'Kuliner_Cinderamata',
+        itemId: item.id,
+        rowData: [
+          item.id,
+          item.name,
+          item.kind,
+          item.krida,
+          item.priceEstimate,
+          item.authorName,
+          item.contactPhone,
+          item.provinceName,
+          item.regencyName,
+          item.imageUrl || '',
+          item.categoryLabel || '',
+          new Date().toISOString()
+        ]
+      };
+
+      await fetch(scriptUrl, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      return { success: true, message: 'Produk kuliner/cinderamata terkirim ke spreadsheet.' };
+    } catch (e: any) {
+      return { success: false, message: e.message };
+    }
+  }
+
+  /**
+   * Kirim agenda kegiatan / event ke Google Spreadsheet
+   */
+  public async appendActivityToSpreadsheet(activity: any): Promise<{ success: boolean; message: string }> {
+    const scriptUrl = this.config.scriptUrl;
+    if (!scriptUrl) return { success: true, message: 'Tersimpan secara lokal.' };
+
+    try {
+      const payload = {
+        action: 'UPSERT_ACTIVITY',
+        sheet: 'Agenda_Kegiatan',
+        itemId: activity.id,
+        rowData: [
+          activity.id,
+          activity.title,
+          activity.category,
+          activity.organizerLevel,
+          activity.organizerName,
+          activity.locationName,
+          activity.provinceName,
+          activity.startDate,
+          activity.endDate,
+          activity.feeType,
+          activity.feeAmount || 0,
+          activity.contactPhone || '',
+          activity.uploadedByName || '',
+          new Date().toISOString()
+        ]
+      };
+
+      await fetch(scriptUrl, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      return { success: true, message: 'Agenda kegiatan terkirim ke spreadsheet.' };
+    } catch (e: any) {
+      return { success: false, message: e.message };
+    }
+  }
+
+  /**
+   * Unggah seluruh data lokal ke Google Spreadsheet secara menyeluruh (Batch Sync)
+   */
+  public async pushAllDataToSpreadsheet(): Promise<{ success: boolean; message: string; counts: { members: number; tours: number; culinary: number; activities: number } }> {
+    const scriptUrl = this.config.scriptUrl;
+    const members = storage.getMembers();
+    const tours = storage.getTourPackages();
+    const culinary = storage.getCulinarySouvenirs();
+    const activities = storage.getActivities();
+
+    const counts = {
+      members: members.length,
+      tours: tours.length,
+      culinary: culinary.length,
+      activities: activities.length
+    };
+
+    if (!scriptUrl) {
+      return {
+        success: false,
+        message: 'Google Apps Script Web App URL belum diisi. Harap masukkan Web App URL di tab "Pengaturan API" terlebih dahulu.',
+        counts
+      };
+    }
+
+    try {
+      const payload = {
+        action: 'SYNC_ALL_DATA',
+        members: members.map(m => [
+          m.id,
+          m.nationalMemberNumber || '',
+          m.fullName,
+          m.email,
+          m.phone,
+          m.provinceName,
+          m.regencyName,
+          m.branchName,
+          m.gugusDepan,
+          m.krida || '',
+          m.status,
+          m.avatarUrl,
+          m.registeredAt,
+          window.location.origin + '/?verifyId=' + (m.nationalMemberNumber || m.id)
+        ]),
+        tours: tours.map(t => [
+          t.id,
+          t.title,
+          t.category,
+          t.pricePerPerson,
+          t.durationDays,
+          t.locationAddress,
+          t.provinceName,
+          t.regencyName,
+          t.ownerName,
+          t.contactPhone,
+          t.coverImage || '',
+          new Date().toISOString()
+        ]),
+        culinary: culinary.map(c => [
+          c.id,
+          c.name,
+          c.kind,
+          c.krida,
+          c.priceEstimate,
+          c.authorName,
+          c.contactPhone,
+          c.provinceName,
+          c.regencyName,
+          c.imageUrl || '',
+          c.categoryLabel || '',
+          new Date().toISOString()
+        ]),
+        activities: activities.map(a => [
+          a.id,
+          a.title,
+          a.category,
+          a.organizerLevel,
+          a.organizerName,
+          a.locationName,
+          a.provinceName,
+          a.startDate,
+          a.endDate,
+          a.feeType,
+          a.feeAmount || 0,
+          a.contactPhone || '',
+          a.uploadedByName || '',
+          new Date().toISOString()
+        ])
+      };
+
+      await fetch(scriptUrl, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      this.saveConfig({
+        lastSyncedAt: new Date().toISOString(),
+        status: 'CONNECTED',
+        lastError: undefined
+      });
+
+      return {
+        success: true,
+        message: `Berhasil mengirim seluruh data ke Google Spreadsheet: ${members.length} Anggota, ${tours.length} Paket Wisata, ${culinary.length} Kuliner/Kriya, ${activities.length} Agenda Kegiatan.`,
+        counts
+      };
+    } catch (err: any) {
+      console.error('Push all failed:', err);
+      return {
+        success: false,
+        message: `Gagal mengirim data ke spreadsheet: ${err.message}`,
+        counts
+      };
+    }
+  }
+
+  /**
    * Hasilkan Template Script Google Apps Script yang siap di-copy-paste oleh user
    */
   public getGoogleAppsScriptTemplate(): string {
-    return `// ============================================================
-// GOOGLE APPS SCRIPT: API DATABASE SAKA PARIWISATA INDONESIA
-// ============================================================
-// Cara Pasang:
-// 1. Di Google Sheets, klik menu "Extensions" > "Apps Script".
-// 2. Hapus semua kode yang ada, lalu tempelkan kode di bawah ini.
-// 3. Klik tombol "Deploy" (Terapkan) > "New deployment" (Penerapan Baru).
+    return `// =========================================================================
+// GOOGLE APPS SCRIPT: MASTER DATABASE & DRIVE API SAKA PARIWISATA INDONESIA
+// =========================================================================
+// Panduan Penerapan (Deployment Guide):
+// 1. Di Google Sheets Anda, klik menu: "Ekstensi" (Extensions) > "Apps Script".
+// 2. Hapus semua baris kode yang ada, lalu tempelkan seluruh skrip di bawah ini.
+// 3. Klik tombol "Deploy" (Terapkan) di pojok kanan atas > pilih "New deployment" (Penerapan baru).
 // 4. Pilih jenis "Web app" (Aplikasi Web).
-// 5. Atur "Execute as: Me" dan "Who has access: Anyone (Siapa saja)".
-// 6. Klik "Deploy", salin URL Web App dan tempelkan ke Pengaturan Aplikasi Saka.
-// ============================================================
+// 5. Konfigurasi:
+//    - Description: "Saka Pariwisata Database & Media API v2"
+//    - Execute as: "Me" (Jalankan sebagai: Saya)
+//    - Who has access: "Anyone" (Siapa saja)  <-- WAJIB PILIH "ANYONE" AGAR BISA DITULIS DARI APLIKASI
+// 6. Klik "Deploy", beri izin akses Google jika diminta, lalu salin URL Web App yang berakhiran "/exec".
+// 7. Tempelkan URL tersebut ke Pengaturan Database di Aplikasi Saka Pariwisata.
+// =========================================================================
 
 function doGet(e) {
   var sheetName = (e && e.parameter && e.parameter.sheet) ? e.parameter.sheet : "Anggota";
@@ -423,7 +671,7 @@ function doGet(e) {
   var sheet = ss.getSheetByName(sheetName);
   
   if (!sheet) {
-    return ContentService.createTextOutput(JSON.stringify({ error: "Sheet tidak ditemukan" }))
+    return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "Sheet tidak ditemukan: " + sheetName }))
       .setMimeType(ContentService.MimeType.JSON);
   }
   
@@ -450,36 +698,119 @@ function doGet(e) {
 
 function doPost(e) {
   try {
+    if (!e || !e.postData || !e.postData.contents) {
+      return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "Tidak ada payload data" }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
     var body = JSON.parse(e.postData.contents);
-    var sheetName = body.sheet || "Anggota";
     var ss = SpreadsheetApp.getActiveSpreadsheet();
+
+    // 1. AKSI UPLOAD GAMBAR KE GOOGLE DRIVE
+    if (body.action === "UPLOAD_DRIVE_IMAGE") {
+      var folderId = body.folderId || "16Ql42x6HBWJIB8ss7abnurS_Kne5HYvh";
+      var folder;
+      try {
+        folder = DriveApp.getFolderById(folderId);
+      } catch (fErr) {
+        folder = DriveApp.getRootFolder();
+      }
+
+      var base64Data = body.base64.replace(/^data:image\\/\\w+;base64,/, "");
+      var decoded = Utilities.base64Decode(base64Data);
+      var blob = Utilities.newBlob(decoded, body.mimeType || "image/jpeg", body.filename || ("saka_media_" + Date.now() + ".jpg"));
+      var file = folder.createFile(blob);
+      file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+      
+      var directUrl = "https://lh3.googleusercontent.com/d/" + file.getId();
+      return ContentService.createTextOutput(JSON.stringify({
+        status: "success",
+        fileId: file.getId(),
+        directUrl: directUrl,
+        viewUrl: file.getUrl()
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // 2. AKSI BATCH SINKRONISASI SELURUH DATA (SYNC_ALL_DATA)
+    if (body.action === "SYNC_ALL_DATA") {
+      syncSheetData(ss, "Anggota", [
+        "ID", "Nomor KTA", "Nama Lengkap", "Email", "Nomor WA", "Provinsi", "Kabupaten/Kota", 
+        "Kwarran/Kecamatan", "Gudep", "Krida", "Status", "Foto URL", "Tanggal Daftar", "Link Verifikasi"
+      ], body.members || []);
+
+      syncSheetData(ss, "Paket_Wisata", [
+        "ID", "Nama Paket", "Kategori", "Harga", "Durasi (Hari)", "Lokasi", "Provinsi", 
+        "Kabupaten/Kota", "Penyelenggara", "Kontak WA", "Foto Banner", "Waktu Diperbarui"
+      ], body.tours || []);
+
+      syncSheetData(ss, "Kuliner_Cinderamata", [
+        "ID", "Nama Produk", "Jenis", "Kategori", "Harga", "Produsen/Pengrajin", "Kontak WA", 
+        "Provinsi", "Kabupaten/Kota", "Foto Produk", "Sertifikasi Halal", "Waktu Diperbarui"
+      ], body.culinary || []);
+
+      syncSheetData(ss, "Agenda_Kegiatan", [
+        "ID", "Nama Agenda", "Kategori", "Skala Tingkat", "Penyelenggara", "Lokasi", 
+        "Provinsi", "Tanggal Mulai", "Tanggal Selesai", "Jenis Biaya", "Nominal Biaya", 
+        "Kontak Narahubung", "Didaftarkan Oleh", "Waktu Diperbarui"
+      ], body.activities || []);
+
+      return ContentService.createTextOutput(JSON.stringify({
+        status: "success",
+        message: "Seluruh data (Anggota, Paket Wisata, Kuliner, Agenda) berhasil disinkronkan ke Google Spreadsheet."
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // 3. AKSI TULIS BARIS TUNGGAL (UPSERT / APPEND)
+    var sheetName = body.sheet || "Anggota";
     var sheet = ss.getSheetByName(sheetName);
-    
     if (!sheet) {
       sheet = ss.insertSheet(sheetName);
     }
-    
-    if (body.action === "DELETE") {
-      var memberId = body.memberId;
-      var data = sheet.getDataRange().getValues();
-      for (var i = 1; i < data.length; i++) {
-        if (data[i][0] == memberId || data[i][1] == memberId) {
-          sheet.deleteRow(i + 1);
-          break;
-        }
-      }
-      return ContentService.createTextOutput(JSON.stringify({ status: "success", message: "Baris berhasil dihapus" }))
-        .setMimeType(ContentService.MimeType.JSON);
+
+    if (body.rowData && Array.isArray(body.rowData)) {
+      sheet.appendRow(body.rowData);
     }
-    
-    // Tambah baris baru
-    sheet.appendRow(body.rowData);
-    
-    return ContentService.createTextOutput(JSON.stringify({ status: "success", message: "Data berhasil disimpan ke Google Sheets" }))
-      .setMimeType(ContentService.MimeType.JSON);
+
+    return ContentService.createTextOutput(JSON.stringify({
+      status: "success",
+      message: "Data berhasil disimpan ke sheet " + sheetName
+    })).setMimeType(ContentService.MimeType.JSON);
+
   } catch (err) {
-    return ContentService.createTextOutput(JSON.stringify({ status: "error", message: err.toString() }))
-      .setMimeType(ContentService.MimeType.JSON);
+    return ContentService.createTextOutput(JSON.stringify({
+      status: "error",
+      message: err.toString()
+    })).setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+function syncSheetData(ss, sheetName, defaultHeaders, rowsData) {
+  var sheet = ss.getSheetByName(sheetName);
+  if (!sheet) {
+    sheet = ss.insertSheet(sheetName);
+    sheet.appendRow(defaultHeaders);
+  }
+  
+  if (sheet.getLastRow() === 0) {
+    sheet.appendRow(defaultHeaders);
+  }
+
+  // Jika ada data baru untuk disinkronkan
+  if (rowsData && rowsData.length > 0) {
+    var existingValues = sheet.getDataRange().getValues();
+    var existingIds = {};
+    for (var i = 1; i < existingValues.length; i++) {
+      var rowId = existingValues[i][0];
+      if (rowId) existingIds[rowId] = true;
+    }
+
+    rowsData.forEach(function(row) {
+      var newId = row[0];
+      if (!existingIds[newId]) {
+        sheet.appendRow(row);
+        existingIds[newId] = true;
+      }
+    });
   }
 }`;
   }

@@ -10,9 +10,13 @@ import {
   FileSpreadsheet, 
   Code2, 
   Download, 
+  UploadCloud,
   ShieldCheck,
   Sparkles,
-  Link2
+  Link2,
+  HelpCircle,
+  Zap,
+  Info
 } from 'lucide-react';
 import { spreadsheetService, DEFAULT_SPREADSHEET_ID, DEFAULT_SPREADSHEET_URL, SpreadsheetConfig } from '../../services/spreadsheetService';
 import { storage } from '../../services/storage';
@@ -30,9 +34,10 @@ export const SpreadsheetSyncModal: React.FC<SpreadsheetSyncModalProps> = ({
   const [scriptUrlInput, setScriptUrlInput] = useState(config.scriptUrl || '');
   const [spreadsheetIdInput, setSpreadsheetIdInput] = useState(config.spreadsheetId || DEFAULT_SPREADSHEET_ID);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isPushing, setIsPushing] = useState(false);
   const [syncResult, setSyncResult] = useState<{ success: boolean; message: string } | null>(null);
   const [copiedScript, setCopiedScript] = useState(false);
-  const [activeTab, setActiveTab] = useState<'status' | 'setup' | 'export'>('status');
+  const [activeTab, setActiveTab] = useState<'status' | 'setup' | 'guide' | 'export'>('status');
 
   useEffect(() => {
     if (isOpen) {
@@ -48,6 +53,9 @@ export const SpreadsheetSyncModal: React.FC<SpreadsheetSyncModalProps> = ({
   const membersCount = storage.getMembers().length;
   const toursCount = storage.getTourPackages().length;
   const culinaryCount = storage.getCulinarySouvenirs().length;
+  const activitiesCount = storage.getActivities().length;
+
+  const isScriptConnected = Boolean(config.scriptUrl && config.scriptUrl.startsWith('http'));
 
   const handleSyncNow = async () => {
     setIsSyncing(true);
@@ -69,6 +77,26 @@ export const SpreadsheetSyncModal: React.FC<SpreadsheetSyncModalProps> = ({
     setConfig(spreadsheetService.getConfig());
   };
 
+  const handlePushAllToSheets = async () => {
+    setIsPushing(true);
+    setSyncResult(null);
+
+    // Save updated scriptUrl first
+    if (scriptUrlInput.trim()) {
+      spreadsheetService.saveConfig({
+        scriptUrl: scriptUrlInput.trim()
+      });
+    }
+
+    const result = await spreadsheetService.pushAllDataToSpreadsheet();
+    setIsPushing(false);
+    setSyncResult({
+      success: result.success,
+      message: result.message
+    });
+    setConfig(spreadsheetService.getConfig());
+  };
+
   const handleSaveConfig = (e: React.FormEvent) => {
     e.preventDefault();
     const updated = spreadsheetService.saveConfig({
@@ -77,7 +105,7 @@ export const SpreadsheetSyncModal: React.FC<SpreadsheetSyncModalProps> = ({
       scriptUrl: scriptUrlInput.trim()
     });
     setConfig(updated);
-    alert('Pengaturan database Google Spreadsheet berhasil disimpan.');
+    alert('Pengaturan database Google Spreadsheet & Web App URL berhasil disimpan.');
   };
 
   const handleCopyScript = () => {
@@ -139,19 +167,23 @@ export const SpreadsheetSyncModal: React.FC<SpreadsheetSyncModalProps> = ({
           </div>
           <div>
             <h2 className="text-xl font-extrabold text-slate-900 font-heading flex items-center gap-2">
-              <span>Database Google Spreadsheet</span>
-              <span className="px-2 py-0.5 bg-emerald-100 text-emerald-900 border border-emerald-300 text-[10px] rounded-md font-bold">
-                Terhubung
+              <span>Database Google Spreadsheet & Drive</span>
+              <span className={`px-2 py-0.5 text-[10px] rounded-md font-bold border ${
+                isScriptConnected
+                  ? 'bg-emerald-100 text-emerald-900 border-emerald-300'
+                  : 'bg-amber-100 text-amber-900 border-amber-300'
+              }`}>
+                {isScriptConnected ? '⚡ Web App Aktif (Bisa Menulis)' : '⚠️ Mode Baca / Perlu URL Web App'}
               </span>
             </h2>
             <p className="text-xs text-slate-500">
-              Sinkronisasi data anggota, KTA, paket wisata, dan kuliner langsung dengan Google Spreadsheet
+              Sinkronisasi data anggota, paket wisata, kuliner/kriya, agenda kegiatan, dan berkas foto dengan Google Spreadsheet & Google Drive
             </p>
           </div>
         </div>
 
         {/* Tab Navigation */}
-        <div className="flex bg-slate-100 p-1 rounded-2xl mb-6 text-xs font-bold">
+        <div className="flex bg-slate-100 p-1 rounded-2xl mb-5 text-xs font-bold gap-1">
           <button
             type="button"
             onClick={() => setActiveTab('status')}
@@ -168,7 +200,16 @@ export const SpreadsheetSyncModal: React.FC<SpreadsheetSyncModalProps> = ({
               activeTab === 'setup' ? 'bg-white text-emerald-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            Pengaturan API Web App
+            Pengaturan API
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('guide')}
+            className={`flex-1 py-2 rounded-xl transition-all cursor-pointer ${
+              activeTab === 'guide' ? 'bg-white text-purple-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            📖 Panduan Deploy (Kenapa Belum Berubah?)
           </button>
           <button
             type="button"
@@ -177,19 +218,19 @@ export const SpreadsheetSyncModal: React.FC<SpreadsheetSyncModalProps> = ({
               activeTab === 'export' ? 'bg-white text-emerald-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            Ekspor / Cadangan Data
+            Ekspor CSV
           </button>
         </div>
 
         {/* TAB 1: STATUS & SYNC */}
         {activeTab === 'status' && (
-          <div className="space-y-5">
+          <div className="space-y-4">
             {/* Connected Sheet Card */}
             <div className="p-4 bg-emerald-50/60 rounded-2xl border border-emerald-200/80 space-y-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 text-xs font-bold text-emerald-950">
                   <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                  <span>Google Spreadsheet Database Aktif</span>
+                  <span>Google Spreadsheet Master Terhubung</span>
                 </div>
                 <a
                   href={config.spreadsheetUrl || DEFAULT_SPREADSHEET_URL}
@@ -206,7 +247,7 @@ export const SpreadsheetSyncModal: React.FC<SpreadsheetSyncModalProps> = ({
                 ID: {config.spreadsheetId || DEFAULT_SPREADSHEET_ID}
               </div>
 
-              <div className="grid grid-cols-3 gap-2 text-center text-xs">
+              <div className="grid grid-cols-4 gap-2 text-center text-xs">
                 <div className="bg-white p-2 rounded-xl border border-slate-200">
                   <p className="text-[10px] text-slate-400 font-bold uppercase">Anggota</p>
                   <p className="text-base font-extrabold text-slate-900 font-heading">{membersCount}</p>
@@ -219,8 +260,25 @@ export const SpreadsheetSyncModal: React.FC<SpreadsheetSyncModalProps> = ({
                   <p className="text-[10px] text-slate-400 font-bold uppercase">Kuliner/Karya</p>
                   <p className="text-base font-extrabold text-slate-900 font-heading">{culinaryCount}</p>
                 </div>
+                <div className="bg-white p-2 rounded-xl border border-slate-200">
+                  <p className="text-[10px] text-slate-400 font-bold uppercase">Agenda Event</p>
+                  <p className="text-base font-extrabold text-slate-900 font-heading">{activitiesCount}</p>
+                </div>
               </div>
             </div>
+
+            {/* Warning if scriptUrl is not set */}
+            {!isScriptConnected && (
+              <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-2xl flex items-start gap-2.5 text-xs text-amber-900">
+                <Info className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-bold">Penulisan Otomatis Belum Terhubung</p>
+                  <p className="text-[11px] text-amber-800 mt-0.5">
+                    Data baru tersimpan di browser lokal. Agar perubahan dapat ditulis langsung ke Google Spreadsheet & Google Drive, silakan pasang kode Apps Script di tab <strong>"Pengaturan API"</strong> atau baca tab <strong>"Panduan Deploy"</strong>.
+                  </p>
+                </div>
+              </div>
+            )}
 
             {/* Sync Feedback Message */}
             {syncResult && (
@@ -239,26 +297,26 @@ export const SpreadsheetSyncModal: React.FC<SpreadsheetSyncModalProps> = ({
             )}
 
             {/* Action Buttons */}
-            <div className="flex flex-col sm:flex-row gap-3 pt-2">
+            <div className="flex flex-col sm:flex-row gap-2 pt-1">
+              <button
+                type="button"
+                onClick={handlePushAllToSheets}
+                disabled={isPushing}
+                className="flex-1 py-3 bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white font-bold text-xs rounded-xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+              >
+                <UploadCloud className={`w-4 h-4 ${isPushing ? 'animate-bounce' : ''}`} />
+                <span>{isPushing ? 'Mengirim Data ke Spreadsheet...' : 'Kirim Seluruh Data Lokal ke Google Spreadsheet'}</span>
+              </button>
+
               <button
                 type="button"
                 onClick={handleSyncNow}
                 disabled={isSyncing}
-                className="flex-1 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs rounded-xl shadow-md shadow-emerald-950/20 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                className="px-4 py-3 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
               >
                 <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
-                <span>{isSyncing ? 'Menyinkronkan Data...' : 'Sinkronkan Database Sekarang'}</span>
+                <span>Tarik dari Sheets</span>
               </button>
-
-              <a
-                href={config.spreadsheetUrl || DEFAULT_SPREADSHEET_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="px-4 py-3 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-              >
-                <ExternalLink className="w-4 h-4 text-slate-500" />
-                <span>Buka Dokumen Sheets</span>
-              </a>
             </div>
 
             {config.lastSyncedAt && !isNaN(new Date(config.lastSyncedAt).getTime()) && (
@@ -275,7 +333,7 @@ export const SpreadsheetSyncModal: React.FC<SpreadsheetSyncModalProps> = ({
             <form onSubmit={handleSaveConfig} className="space-y-3">
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Spreadsheet ID
+                  Spreadsheet ID (Google Sheets)
                 </label>
                 <input
                   type="text"
@@ -288,7 +346,7 @@ export const SpreadsheetSyncModal: React.FC<SpreadsheetSyncModalProps> = ({
 
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Google Apps Script Web App URL (Opsional untuk Penulisan Otomatis)
+                  Google Apps Script Web App URL (Wajib untuk Penulisan Otomatis)
                 </label>
                 <input
                   type="url"
@@ -297,8 +355,8 @@ export const SpreadsheetSyncModal: React.FC<SpreadsheetSyncModalProps> = ({
                   placeholder="https://script.google.com/macros/s/.../exec"
                   className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono text-slate-900 outline-none"
                 />
-                <p className="text-[10px] text-slate-400 mt-1">
-                  Jika diisi, pendaftaran anggota baru atau perubahan data akan langsung tersimpan ke Google Spreadsheet Anda secara otomatis.
+                <p className="text-[10px] text-slate-500 mt-1">
+                  Salin URL Web App yang berakhiran <code>/exec</code> setelah men-deploy skrip di bawah dengan izin "Who has access: Anyone".
                 </p>
               </div>
 
@@ -316,7 +374,7 @@ export const SpreadsheetSyncModal: React.FC<SpreadsheetSyncModalProps> = ({
               <div className="flex items-center justify-between mb-2">
                 <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
                   <Code2 className="w-4 h-4 text-purple-700" />
-                  <span>Kode Google Apps Script Web App:</span>
+                  <span>Kode Google Apps Script Master (Multi-Sheet & Drive):</span>
                 </span>
                 <button
                   type="button"
@@ -335,7 +393,50 @@ export const SpreadsheetSyncModal: React.FC<SpreadsheetSyncModalProps> = ({
           </div>
         )}
 
-        {/* TAB 3: EXPORT CSV */}
+        {/* TAB 3: PANDUAN DEPLOY LENGKAP */}
+        {activeTab === 'guide' && (
+          <div className="space-y-4 max-h-[55vh] overflow-y-auto pr-1 custom-scrollbar text-xs">
+            <div className="p-3.5 bg-purple-50 border border-purple-200 rounded-2xl space-y-2 text-purple-950">
+              <h4 className="font-extrabold text-sm flex items-center gap-1.5 text-purple-900">
+                <Sparkles className="w-4 h-4 text-purple-700" />
+                <span>Penyebab Kenapa Data Belum Berubah di Google Sheets:</span>
+              </h4>
+              <p className="text-xs text-purple-900 leading-relaxed">
+                Google Sheets dan Google Drive memiliki proteksi keamanan yang melarang browser web publik untuk menulis atau mengunggah data secara langsung tanpa perantara API resmi. 
+                Oleh karena itu, diperlukan <strong>Google Apps Script Web App</strong> sebagai jembatan API penulisan.
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              <h4 className="font-bold text-slate-900">Langkah Pemasangan API Web App (Hanya 2 Menit):</h4>
+              
+              <ol className="space-y-2.5 list-decimal list-inside text-slate-700">
+                <li className="p-2.5 bg-slate-50 rounded-xl border border-slate-200">
+                  <strong>Buka Google Sheets:</strong> Buka spreadsheet database Anda, lalu klik menu <code>Ekstensi (Extensions) &gt; Apps Script</code>.
+                </li>
+                <li className="p-2.5 bg-slate-50 rounded-xl border border-slate-200">
+                  <strong>Tempelkan Kode:</strong> Hapus kode bawaan, lalu salin dan tempelkan <em>Kode Script Master</em> dari tab <strong>Pengaturan API</strong>.
+                </li>
+                <li className="p-2.5 bg-slate-50 rounded-xl border border-slate-200">
+                  <strong>Terapkan (Deploy):</strong> Klik tombol biru <strong>Deploy (Terapkan)</strong> di pojok kanan atas &gt; pilih <strong>New deployment (Penerapan baru)</strong>.
+                </li>
+                <li className="p-2.5 bg-slate-50 rounded-xl border border-slate-200">
+                  <strong>Pilih Jenis Web App & Izin Akses:</strong>
+                  <ul className="list-disc list-inside mt-1 ml-3 text-[11px] text-slate-600 space-y-0.5">
+                    <li>Pilih jenis: <strong>Web app</strong></li>
+                    <li>Execute as: <strong>Me (Jalankan sebagai saya)</strong></li>
+                    <li><strong className="text-red-600">Who has access: Anyone (Siapa saja)</strong> <span className="text-slate-500">(Penting: agar aplikasi web bisa mengirim data pendaftaran anggota/wisata).</span></li>
+                  </ul>
+                </li>
+                <li className="p-2.5 bg-slate-50 rounded-xl border border-slate-200">
+                  <strong>Salin URL & Simpan:</strong> Salin <strong>Web App URL</strong> yang dihasilkan (berakhiran <code>/exec</code>), tempelkan ke tab <strong>Pengaturan API</strong> di aplikasi ini, dan klik <strong>Simpan</strong>.
+                </li>
+              </ol>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 4: EXPORT CSV */}
         {activeTab === 'export' && (
           <div className="space-y-4">
             <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-2">
@@ -368,3 +469,4 @@ export const SpreadsheetSyncModal: React.FC<SpreadsheetSyncModalProps> = ({
     </div>
   );
 };
+
