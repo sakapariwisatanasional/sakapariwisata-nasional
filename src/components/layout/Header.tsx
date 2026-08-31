@@ -17,11 +17,15 @@ import {
   FileSpreadsheet,
   FolderOpen,
   Home,
-  Lock
+  Lock,
+  CloudCheck,
+  RefreshCw,
+  Check
 } from 'lucide-react';
 import { CurrentUser, NotificationItem } from '../../types';
 import { DEMO_USERS } from '../../data/initialData';
 import { storage } from '../../services/storage';
+import { spreadsheetService } from '../../services/spreadsheetService';
 import { SakaLogo } from '../common/SakaLogo';
 
 interface HeaderProps {
@@ -54,8 +58,23 @@ export const Header: React.FC<HeaderProps> = ({
   const [showMobileSearch, setShowMobileSearch] = useState(false);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [availableUsers, setAvailableUsers] = useState<CurrentUser[]>([]);
+  const [syncState, setSyncState] = useState(spreadsheetService.getSyncState());
+  const [isManualSyncing, setIsManualSyncing] = useState(false);
   const isSuperAdmin = currentUser.role === 'SUPER_ADMIN';
   const isAdmin = ['SUPER_ADMIN', 'ADMIN_PROVINCE', 'ADMIN_REGENCY', 'ADMIN_BRANCH'].includes(currentUser.role);
+
+  const handleManualRefresh = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (isManualSyncing) return;
+    setIsManualSyncing(true);
+    try {
+      await spreadsheetService.syncFromSpreadsheet(false);
+    } catch (err) {
+      console.warn('Manual sync failed:', err);
+    } finally {
+      setIsManualSyncing(false);
+    }
+  };
 
   useEffect(() => {
     const update = () => {
@@ -63,7 +82,15 @@ export const Header: React.FC<HeaderProps> = ({
       setAvailableUsers(storage.getUsers());
     };
     update();
-    return storage.subscribe(update);
+    const unsubStorage = storage.subscribe(update);
+    const unsubSync = spreadsheetService.subscribeSyncState(() => {
+      setSyncState(spreadsheetService.getSyncState());
+    });
+
+    return () => {
+      unsubStorage();
+      unsubSync();
+    };
   }, []);
 
   const unreadCount = notifications.filter(n => !n.isRead).length;
@@ -148,6 +175,55 @@ export const Header: React.FC<HeaderProps> = ({
       {/* Right Controls */}
       <div className="flex items-center gap-1.5 sm:gap-3 flex-shrink-0">
         
+        {/* Live Auto-Save & Real-Time Sync Cloud Status Indicator */}
+        <div 
+          onClick={onOpenSpreadsheetModal}
+          className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold border transition-all cursor-pointer select-none ${
+            syncState.isSaving 
+              ? 'bg-amber-50 text-amber-800 border-amber-300 animate-pulse' 
+              : syncState.hasScriptUrl 
+                ? 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100/80' 
+                : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+          }`}
+          title={
+            syncState.isSaving 
+              ? syncState.lastSavedAction || 'Menyimpan otomatis perubahan ke Google Spreadsheet & Google Drive...' 
+              : syncState.hasScriptUrl
+                ? `Real-Time Cloud Sync Aktif (Terakhir dicek: ${syncState.lastSavedTime || 'Aktif'}). Klik tombol segarkan untuk tarik data terbaru langsung.`
+                : 'Penyimpanan lokal aktif. Hubungkan Google Apps Script untuk sinkronisasi live remote.'
+          }
+        >
+          {syncState.isSaving ? (
+            <>
+              <RefreshCw className="w-3.5 h-3.5 text-amber-600 animate-spin flex-shrink-0" />
+              <span className="text-[11px] font-bold">Menyimpan otomatis...</span>
+            </>
+          ) : syncState.hasScriptUrl ? (
+            <>
+              <span className="relative flex h-2 w-2 flex-shrink-0">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+              </span>
+              <span className="text-[11px] font-bold">
+                {syncState.lastSavedTime ? `Live ${syncState.lastSavedTime.split(' ')[0]}` : 'Real-time'}
+              </span>
+              <button
+                type="button"
+                onClick={handleManualRefresh}
+                className={`p-0.5 hover:bg-emerald-200/60 rounded-md transition-all text-emerald-700 ${isManualSyncing ? 'animate-spin' : ''}`}
+                title="Segarkan data dari Google Spreadsheet sekarang"
+              >
+                <RefreshCw className="w-3 h-3" />
+              </button>
+            </>
+          ) : (
+            <>
+              <Check className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+              <span className="text-[11px] font-medium text-slate-500">Tersimpan</span>
+            </>
+          )}
+        </div>
+
         {/* Tombol Landing Page */}
         <button
           onClick={() => onSelectTab('landing')}

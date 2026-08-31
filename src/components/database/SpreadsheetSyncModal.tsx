@@ -310,6 +310,45 @@ export const SpreadsheetSyncModal: React.FC<SpreadsheetSyncModalProps> = ({
               </div>
             </div>
 
+            {/* Auto-Save Status Banner & Toggle */}
+            <div className="p-3.5 bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-2xl flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <div className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 ${config.autoSync !== false ? 'bg-emerald-600 text-white shadow-xs' : 'bg-slate-200 text-slate-500'}`}>
+                  <Zap className="w-4 h-4" />
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-slate-950 flex items-center gap-1.5">
+                    <span>Simpan Otomatis (Auto-Save ke Spreadsheet & Drive)</span>
+                    <span className={`px-1.5 py-0.2 rounded text-[10px] font-extrabold ${config.autoSync !== false ? 'bg-emerald-200 text-emerald-900' : 'bg-slate-200 text-slate-600'}`}>
+                      {config.autoSync !== false ? 'AKTIF' : 'NONAKTIF'}
+                    </span>
+                  </p>
+                  <p className="text-[11px] text-slate-600 leading-tight mt-0.5">
+                    {config.autoSync !== false 
+                      ? 'Setiap data yang ditambahkan/diedit/dihapus otomatis langsung disinkronkan ke Google Spreadsheet & Drive tanpa perlu tombol simpan manual.'
+                      : 'Simpan otomatis nonaktif. Data hanya tersimpan di cache lokal.'}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  const updated = spreadsheetService.saveConfig({
+                    autoSync: !(config.autoSync !== false)
+                  });
+                  setConfig(updated);
+                }}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex-shrink-0 border ${
+                  config.autoSync !== false
+                    ? 'bg-emerald-700 hover:bg-emerald-800 text-white border-emerald-800 shadow-xs'
+                    : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-300'
+                }`}
+              >
+                {config.autoSync !== false ? 'Aktif' : 'Aktifkan'}
+              </button>
+            </div>
+
             {/* Google Drive Folder Card */}
             <div className="p-4 bg-purple-50/60 rounded-2xl border border-purple-200/80 space-y-2.5">
               <div className="flex items-center justify-between">

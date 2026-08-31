@@ -42,16 +42,103 @@ class SpreadsheetService {
   private isPushing = false;
   private isSettingUp = false;
   private isSyncing = false;
+  private syncListeners: (() => void)[] = [];
+  private broadcastChannel: BroadcastChannel | null = null;
+  private liveSyncTimer: any = null;
+  private isLiveSyncActive = false;
+  private lastKnownMemberCount = 0;
+  private syncState = {
+    isSaving: false,
+    lastSavedTime: null as string | null,
+    lastSavedAction: null as string | null,
+    error: null as string | null,
+    isLivePolling: true,
+    lastLiveCheck: null as string | null
+  };
 
   constructor() {
     this.config = this.loadConfig();
+    this.initBroadcastChannel();
+    this.initAutoSync();
+    this.startLiveSyncEngine(10000); // Poll every 10 seconds for real-time cloud data
+  }
+
+  private initBroadcastChannel() {
+    try {
+      if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+        this.broadcastChannel = new BroadcastChannel('saka_realtime_cloud_sync_v1');
+        this.broadcastChannel.onmessage = (event) => {
+          if (event.data?.type === 'REMOTE_MUTATION' || event.data?.type === 'POLL_TRIGGER') {
+            this.syncFromSpreadsheet(true); // Silent sync on broadcast message
+          }
+        };
+      }
+    } catch (err) {
+      console.warn('BroadcastChannel initialization fallback:', err);
+    }
+  }
+
+  private broadcastRemoteEvent(type: string, payload?: any) {
+    try {
+      if (this.broadcastChannel) {
+        this.broadcastChannel.postMessage({
+          type: 'REMOTE_MUTATION',
+          mutationType: type,
+          payload,
+          timestamp: Date.now()
+        });
+      }
+    } catch (e) {
+      // Ignore broadcast errors
+    }
+  }
+
+  public startLiveSyncEngine(intervalMs: number = 10000) {
+    if (this.isLiveSyncActive && this.liveSyncTimer) return;
+    this.isLiveSyncActive = true;
+
+    // 1. Silent initial sync
+    setTimeout(() => {
+      this.syncFromSpreadsheet(true).catch(() => {});
+    }, 1500);
+
+    // 2. Interval polling every intervalMs (e.g. 10s)
+    this.liveSyncTimer = setInterval(() => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        this.syncFromSpreadsheet(true).catch(() => {});
+      }
+    }, intervalMs);
+
+    // 3. Listen for window focus & visibility change for instant sync
+    if (typeof window !== 'undefined') {
+      const handleFocusOrVisible = () => {
+        if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+          this.syncFromSpreadsheet(true).catch(() => {});
+        }
+      };
+
+      window.addEventListener('focus', handleFocusOrVisible);
+      document.addEventListener('visibilitychange', handleFocusOrVisible);
+    }
+  }
+
+  public stopLiveSyncEngine() {
+    this.isLiveSyncActive = false;
+    if (this.liveSyncTimer) {
+      clearInterval(this.liveSyncTimer);
+      this.liveSyncTimer = null;
+    }
   }
 
   private loadConfig(): SpreadsheetConfig {
     try {
       const raw = localStorage.getItem(SPREADSHEET_CONFIG_KEY);
       if (raw) {
-        return JSON.parse(raw);
+        const parsed = JSON.parse(raw);
+        return {
+          ...parsed,
+          autoSync: parsed.autoSync !== undefined ? parsed.autoSync : true
+        };
       }
     } catch (e) {
       console.error('Failed to load spreadsheet config', e);
@@ -61,7 +148,7 @@ class SpreadsheetService {
       spreadsheetId: DEFAULT_SPREADSHEET_ID,
       spreadsheetUrl: DEFAULT_SPREADSHEET_URL,
       scriptUrl: '',
-      autoSync: false,
+      autoSync: true,
       status: 'CONNECTED'
     };
   }
@@ -69,11 +156,178 @@ class SpreadsheetService {
   public saveConfig(updates: Partial<SpreadsheetConfig>): SpreadsheetConfig {
     this.config = { ...this.config, ...updates };
     localStorage.setItem(SPREADSHEET_CONFIG_KEY, JSON.stringify(this.config));
+    this.notifySyncState();
     return this.config;
   }
 
   public getConfig(): SpreadsheetConfig {
     return { ...this.config };
+  }
+
+  public getSyncState() {
+    return {
+      ...this.syncState,
+      autoSync: this.config.autoSync !== false,
+      hasScriptUrl: Boolean(this.config.scriptUrl && this.config.scriptUrl.trim().length > 0)
+    };
+  }
+
+  public subscribeSyncState(listener: () => void) {
+    this.syncListeners.push(listener);
+    return () => {
+      this.syncListeners = this.syncListeners.filter(l => l !== listener);
+    };
+  }
+
+  private notifySyncState() {
+    this.syncListeners.forEach(cb => {
+      try {
+        cb();
+      } catch (err) {
+        console.warn('Sync listener error:', err);
+      }
+    });
+  }
+
+  private initAutoSync() {
+    storage.subscribeMutation(async (event) => {
+      if (this.config.autoSync === false) return;
+      await this.handleAutoSyncMutation(event);
+    });
+  }
+
+  private async handleAutoSyncMutation(event: any) {
+    const scriptUrl = this.config.scriptUrl;
+    if (!scriptUrl) return;
+
+    this.syncState.isSaving = true;
+    this.syncState.error = null;
+    this.syncState.lastSavedAction = `Menyimpan otomatis data ${event.type?.toLowerCase() || 'item'} ke Spreadsheet & Google Drive...`;
+    this.notifySyncState();
+
+    try {
+      if (event.type === 'MEMBER') {
+        if (event.action === 'CREATE' || event.action === 'UPDATE' || event.action === 'PHOTO_UPDATE') {
+          const member: Member = event.payload;
+          if (member) {
+            if (member.avatarUrl && member.avatarUrl.startsWith('data:image')) {
+              try {
+                const fname = `KTA_${member.nationalMemberNumber || member.id}_${(member.fullName || 'Anggota').replace(/[^a-zA-Z0-9]/g, '_')}.jpg`;
+                const uploadRes = await this.uploadImageToDrive(member.avatarUrl, fname, 'MEMBER_AVATAR');
+                if (uploadRes.directUrl) {
+                  member.avatarUrl = uploadRes.directUrl;
+                }
+              } catch (imgErr) {
+                console.warn('Auto drive upload error:', imgErr);
+              }
+            }
+            await this.appendMemberToSpreadsheet(member);
+          }
+        } else if (event.action === 'DELETE') {
+          const delPayload = event.payload || {};
+          await this.deleteRowFromSpreadsheet('Anggota', delPayload.id || delPayload.memberId || event.id, delPayload.member?.nationalMemberNumber || delPayload.kta);
+        }
+      } else if (event.type === 'TOUR') {
+        if (event.action === 'CREATE' || event.action === 'UPDATE') {
+          const tour: TourPackage = event.payload;
+          if (tour) {
+            if (tour.coverImage && tour.coverImage.startsWith('data:image')) {
+              try {
+                const fname = `TOUR_${tour.id}_${(tour.title || 'Wisata').replace(/[^a-zA-Z0-9]/g, '_')}.jpg`;
+                const uploadRes = await this.uploadImageToDrive(tour.coverImage, fname, 'TOUR_PACKAGES');
+                if (uploadRes.directUrl) {
+                  tour.coverImage = uploadRes.directUrl;
+                }
+              } catch (e) {}
+            }
+            await this.appendTourToSpreadsheet(tour);
+          }
+        } else if (event.action === 'DELETE') {
+          const delPayload = event.payload || {};
+          await this.deleteRowFromSpreadsheet('Paket_Wisata', delPayload.tourId || delPayload.id || event.id);
+        }
+      } else if (event.type === 'CULINARY') {
+        if (event.action === 'CREATE' || event.action === 'UPDATE') {
+          const item: CulinarySouvenirItem = event.payload;
+          if (item) {
+            if (item.imageUrl && item.imageUrl.startsWith('data:image')) {
+              try {
+                const fname = `PROD_${item.id}_${(item.name || 'Produk').replace(/[^a-zA-Z0-9]/g, '_')}.jpg`;
+                const uploadRes = await this.uploadImageToDrive(item.imageUrl, fname, 'CULINARY_SOUVENIRS');
+                if (uploadRes.directUrl) {
+                  item.imageUrl = uploadRes.directUrl;
+                }
+              } catch (e) {}
+            }
+            await this.appendCulinaryToSpreadsheet(item);
+          }
+        } else if (event.action === 'DELETE') {
+          const delPayload = event.payload || {};
+          await this.deleteRowFromSpreadsheet('Kuliner_Cinderamata', delPayload.id || event.id);
+        }
+      } else if (event.type === 'ACTIVITY') {
+        if (event.action === 'CREATE' || event.action === 'UPDATE') {
+          const act: Activity = event.payload;
+          if (act) {
+            if (act.bannerUrl && act.bannerUrl.startsWith('data:image')) {
+              try {
+                const fname = `ACT_${act.id}_${(act.title || 'Kegiatan').replace(/[^a-zA-Z0-9]/g, '_')}.jpg`;
+                const uploadRes = await this.uploadImageToDrive(act.bannerUrl, fname, 'ACTIVITIES');
+                if (uploadRes.directUrl) {
+                  act.bannerUrl = uploadRes.directUrl;
+                }
+              } catch (e) {}
+            }
+            await this.appendActivityToSpreadsheet(act);
+          }
+        } else if (event.action === 'DELETE') {
+          const delPayload = event.payload || {};
+          await this.deleteRowFromSpreadsheet('Agenda_Kegiatan', delPayload.activityId || delPayload.id || event.id);
+        }
+      }
+
+      this.syncState.isSaving = false;
+      this.syncState.lastSavedTime = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' WIB';
+      this.syncState.lastSavedAction = `Perubahan data berhasil disimpan otomatis ke Google Spreadsheet & Google Drive`;
+      this.notifySyncState();
+
+      // Siarkan ke seluruh tab browser lain agar langsung sinkron
+      this.broadcastRemoteEvent(event.type, event.payload);
+    } catch (err: any) {
+      console.error('Auto sync error:', err);
+      this.syncState.isSaving = false;
+      this.syncState.error = err.message;
+      this.notifySyncState();
+    }
+  }
+
+  /**
+   * Hapus baris dari Google Spreadsheet berdasarkan ID atau Nomor KTA
+   */
+  public async deleteRowFromSpreadsheet(sheet: string, id: string, secondaryId?: string): Promise<{ success: boolean; message: string }> {
+    const scriptUrl = this.config.scriptUrl;
+    if (!scriptUrl) return { success: true, message: 'Tersimpan lokal.' };
+
+    try {
+      const payload = {
+        action: 'DELETE_ROW',
+        sheet,
+        id,
+        secondaryId
+      };
+
+      await fetch(scriptUrl, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      return { success: true, message: `Baris ${id} dihapus dari sheet ${sheet}.` };
+    } catch (e: any) {
+      console.error('Delete row from sheet failed', e);
+      return { success: false, message: e.message };
+    }
   }
 
   /**
@@ -160,8 +414,28 @@ class SpreadsheetService {
    */
   public async fetchSheetRows(sheetName: string = 'Anggota'): Promise<Record<string, any>[]> {
     const spreadsheetId = this.config.spreadsheetId || DEFAULT_SPREADSHEET_ID;
+    const scriptUrl = this.config.scriptUrl;
 
-    // Daftar variasi nama sheet yang mungkin digunakan
+    // 1. Prioritaskan pengambilan data melalui Google Apps Script Web App jika sudah terpasang
+    if (scriptUrl && scriptUrl.trim().length > 0) {
+      try {
+        const gasUrl = `${scriptUrl}${scriptUrl.includes('?') ? '&' : '?'}sheet=${encodeURIComponent(sheetName)}&_t=${Date.now()}`;
+        const gasResponse = await fetch(gasUrl, {
+          method: 'GET',
+          cache: 'no-store'
+        });
+        if (gasResponse.ok) {
+          const gasData = await gasResponse.json();
+          if (Array.isArray(gasData) && gasData.length > 0) {
+            return gasData;
+          }
+        }
+      } catch (gasErr) {
+        // Fallback ke GViz API jika GAS web app ada kendala network
+      }
+    }
+
+    // 2. Daftar variasi nama sheet yang mungkin digunakan melalui Google Visualization API
     const sheetCandidates: string[] = [sheetName];
     if (sheetName.toLowerCase().includes('anggota')) {
       sheetCandidates.push(
@@ -251,11 +525,11 @@ class SpreadsheetService {
           }
         }
       } catch (err: any) {
-        console.warn(`GVIZ fetch candidate "${targetSheet}" error:`, err?.message || err);
+        // Abaikan kandidat yang tidak cocok secara silent
       }
     }
 
-    // 2. Fallback: Coba CSV Export URL
+    // 3. Fallback: Coba CSV Export URL secara aman tanpa uncaught error
     try {
       const csvCacheBuster = `&_t=${Date.now()}&_rnd=${Math.floor(Math.random() * 1000000)}`;
       const csvUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/export?format=csv&sheet=${encodeURIComponent(sheetName)}${csvCacheBuster}`;
@@ -267,13 +541,13 @@ class SpreadsheetService {
           'Expires': '0'
         }
       });
-      if (response.ok) {
+      if (response && response.ok) {
         const csvText = await response.text();
         const parsed = this.parseCSV(csvText);
         if (parsed.length > 0) return parsed;
       }
     } catch (csvErr: any) {
-      console.error('CSV fetch fallback failed:', csvErr);
+      // Penanganan fallback secara graceful tanpa mengotori log error sistem
     }
 
     return [];
@@ -373,25 +647,31 @@ class SpreadsheetService {
   }
 
   /**
-   * Tarik data dari Google Spreadsheet dan perbarui state aplikasi
+   * Tarik data dari Google Spreadsheet dan perbarui state aplikasi secara real-time
    */
-  public async syncFromSpreadsheet(): Promise<{ success: boolean; count: number; message: string }> {
+  public async syncFromSpreadsheet(silent: boolean = false): Promise<{ success: boolean; count: number; message: string }> {
     if (this.isSyncing) {
       return { success: false, count: 0, message: 'Proses sinkronisasi sedang berjalan...' };
     }
 
     this.isSyncing = true;
-    this.saveConfig({ status: 'SYNCING' });
+    if (!silent) {
+      this.saveConfig({ status: 'SYNCING' });
+    }
 
     try {
       // 1. Sinkronisasi Data Anggota
       const rows = await this.fetchSheetRows('Anggota');
       let memberCount = 0;
       let addedMemberCount = 0;
+      const newlyDiscoveredMembers: Member[] = [];
       
       if (rows && rows.length > 0) {
         const existingMembers = storage.getMembers();
         const existingUsers = storage.getUsers();
+        const prevMemberIds = new Set(existingMembers.map(m => m.id));
+        const prevMemberKta = new Set(existingMembers.map(m => m.nationalMemberNumber ? m.nationalMemberNumber.trim() : ''));
+        const prevMemberEmails = new Set(existingMembers.map(m => m.email ? m.email.toLowerCase().trim() : ''));
 
         const parseRole = (roleStr?: string, prov?: string, kab?: string): UserRole => {
           const r = (roleStr || '').toUpperCase().replace(/\s+/g, '_');
@@ -573,6 +853,14 @@ class SpreadsheetService {
               (newM.email && m.email && m.email.toLowerCase().trim() === newM.email.toLowerCase().trim())
             );
 
+            const isNewMember = !prevMemberIds.has(newM.id) && 
+              (!newM.nationalMemberNumber || !prevMemberKta.has(newM.nationalMemberNumber.trim())) &&
+              (!newM.email || !prevMemberEmails.has(newM.email.toLowerCase().trim()));
+
+            if (isNewMember) {
+              newlyDiscoveredMembers.push(newM);
+            }
+
             if (existingIdx !== -1) {
               // Update in place
               merged[existingIdx] = {
@@ -613,6 +901,20 @@ class SpreadsheetService {
               mergedUsers.push(userObj);
             }
           });
+
+          // Kirim notifikasi jika terdeteksi pendaftaran anggota baru dari perangkat lain
+          if (this.lastKnownMemberCount > 0 && newlyDiscoveredMembers.length > 0) {
+            newlyDiscoveredMembers.forEach(nm => {
+              storage.addNotification(
+                'user-superadmin-rohadi',
+                `Pendaftaran Anggota Baru (${nm.krida})`,
+                `Kak ${nm.fullName} (${nm.branchName || 'Kwarran'}, ${nm.regencyName}) baru saja mendaftar online. Data langsung sinkron secara real-time.`,
+                'SUCCESS',
+                '/members'
+              );
+            });
+          }
+          this.lastKnownMemberCount = importedMembers.length;
 
           storage.setMembers(merged);
           storage.setUsers(mergedUsers);
@@ -830,6 +1132,13 @@ class SpreadsheetService {
 
       // Bersihkan duplikat database
       storage.deduplicateDatabase();
+
+      const timeStr = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' WIB';
+      this.syncState.lastLiveCheck = timeStr;
+      if (!this.syncState.lastSavedTime) {
+        this.syncState.lastSavedTime = timeStr;
+      }
+      this.notifySyncState();
 
       const successMsg = `Berhasil menyinkronkan database spreadsheet. ${memberCount} data anggota terbaca (${addedMemberCount} data baru ditambahkan).`;
       this.saveConfig({
@@ -1172,7 +1481,7 @@ class SpreadsheetService {
   public async uploadImageToDrive(
     base64Data: string, 
     filename: string, 
-    category: 'MEMBER_AVATAR' | 'TOUR_PACKAGES' | 'CULINARY_SOUVENIRS' | 'DOCUMENTS' | 'KTA_CARD' = 'MEMBER_AVATAR'
+    category: 'MEMBER_AVATAR' | 'TOUR_PACKAGES' | 'CULINARY_SOUVENIRS' | 'DOCUMENTS' | 'KTA_CARD' | 'ACTIVITIES' = 'MEMBER_AVATAR'
   ): Promise<{ success: boolean; directUrl?: string; fileId?: string; viewUrl?: string; message: string }> {
     const scriptUrl = this.config.scriptUrl;
     if (!scriptUrl) {
@@ -1521,7 +1830,34 @@ function doPost(e) {
       })).setMimeType(ContentService.MimeType.JSON);
     }
 
-    // 4. AKSI TULIS BARIS TUNGGAL DENGAN UPSERT (CEK DUPLIKASI ID & KTA)
+    // 4. AKSI HAPUS BARIS TERTENTU (DELETE_ROW)
+    if (body.action === "DELETE_ROW") {
+      var targetSheetName = body.sheet || "Anggota";
+      var targetSheet = ss.getSheetByName(targetSheetName);
+      if (!targetSheet) {
+        return ContentService.createTextOutput(JSON.stringify({ status: "success", message: "Sheet tidak ada, tidak ada yang dihapus." })).setMimeType(ContentService.MimeType.JSON);
+      }
+
+      var delId = String(body.id || "").trim();
+      var delSecId = String(body.secondaryId || "").trim();
+      var sheetVals = targetSheet.getDataRange().getValues();
+
+      for (var rowIdx = sheetVals.length - 1; rowIdx >= 1; rowIdx--) {
+        var cell1 = String(sheetVals[rowIdx][0] || "").trim();
+        var cell2 = String(sheetVals[rowIdx][1] || "").trim();
+        if ((delId && cell1 === delId) || (delSecId && cell2 === delSecId)) {
+          targetSheet.deleteRow(rowIdx + 1);
+          break;
+        }
+      }
+
+      return ContentService.createTextOutput(JSON.stringify({
+        status: "success",
+        message: "Data " + delId + " berhasil dihapus dari " + targetSheetName
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // 5. AKSI TULIS BARIS TUNGGAL DENGAN UPSERT (CEK DUPLIKASI ID & KTA)
     var sheetName = body.sheet || "Anggota";
     var sheet = ss.getSheetByName(sheetName);
     if (!sheet) {

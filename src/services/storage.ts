@@ -54,6 +54,15 @@ export const DEFAULT_KTA_SETTINGS: KtaCardSettings = {
   showStamp: true
 };
 
+export type StorageMutationEvent = {
+  type: 'MEMBER' | 'TOUR' | 'CULINARY' | 'ACTIVITY' | 'SYSTEM';
+  action: 'CREATE' | 'UPDATE' | 'DELETE' | 'PHOTO_UPDATE' | 'SYNC';
+  id?: string;
+  payload?: any;
+};
+
+export type MutationListener = (event: StorageMutationEvent) => void;
+
 const STORAGE_KEYS = {
   IS_INITIALIZED: 'saka_initialized_v2',
   MEMBERS: 'saka_members_v2',
@@ -70,6 +79,7 @@ const STORAGE_KEYS = {
 
 class StorageService {
   private listeners: (() => void)[] = [];
+  private mutationListeners: MutationListener[] = [];
 
   constructor() {
     this.init();
@@ -189,8 +199,67 @@ class StorageService {
     };
   }
 
-  private notify() {
+  public onMutation(listener: MutationListener): () => void {
+    this.mutationListeners.push(listener);
+    return () => {
+      this.mutationListeners = this.mutationListeners.filter(l => l !== listener);
+    };
+  }
+
+  public subscribeMutation(listener: MutationListener): () => void {
+    return this.onMutation(listener);
+  }
+
+  private emitMutation(mutationType: string, payload?: any) {
+    let type: StorageMutationEvent['type'] = 'SYSTEM';
+    let action: StorageMutationEvent['action'] = 'UPDATE';
+    let id = payload?.id || payload?.memberId || payload?.tourId || payload?.activityId;
+
+    if (mutationType.includes('MEMBER')) {
+      type = 'MEMBER';
+      if (mutationType.includes('DELETE')) action = 'DELETE';
+      else if (mutationType.includes('REGISTER') || mutationType.includes('CREATE')) action = 'CREATE';
+      else if (mutationType.includes('PHOTO')) action = 'PHOTO_UPDATE';
+      else if (mutationType.includes('STATUS')) action = 'UPDATE';
+      else action = 'UPDATE';
+    } else if (mutationType.includes('TOUR')) {
+      type = 'TOUR';
+      if (mutationType.includes('DELETE')) action = 'DELETE';
+      else if (mutationType.includes('CREATE') || mutationType.includes('ADD')) action = 'CREATE';
+      else action = 'UPDATE';
+    } else if (mutationType.includes('CULINARY')) {
+      type = 'CULINARY';
+      if (mutationType.includes('DELETE')) action = 'DELETE';
+      else if (mutationType.includes('CREATE') || mutationType.includes('ADD')) action = 'CREATE';
+      else action = 'UPDATE';
+    } else if (mutationType.includes('ACTIVITY')) {
+      type = 'ACTIVITY';
+      if (mutationType.includes('DELETE')) action = 'DELETE';
+      else if (mutationType.includes('CREATE') || mutationType.includes('ADD')) action = 'CREATE';
+      else action = 'UPDATE';
+    }
+
+    const event: StorageMutationEvent = {
+      type,
+      action,
+      payload,
+      id
+    };
+
+    this.mutationListeners.forEach(listener => {
+      try {
+        listener(event);
+      } catch (err) {
+        console.warn('Storage mutation listener error:', err);
+      }
+    });
+  }
+
+  private notify(mutationType?: string, payload?: any) {
     this.listeners.forEach(cb => cb());
+    if (mutationType) {
+      this.emitMutation(mutationType, payload);
+    }
   }
 
   // --- Current User & Roles ---
@@ -504,7 +573,7 @@ class StorageService {
     }
 
     localStorage.setItem(STORAGE_KEYS.MEMBERS, JSON.stringify(members));
-    this.notify();
+    this.notify('UPDATE_MEMBER', member);
     return member;
   }
 
@@ -567,7 +636,7 @@ class StorageService {
       `Super Admin menghapus data keanggotaan ${target.fullName} (${target.nationalMemberNumber || 'Belum ada NTA'}). Alasan: ${reason}`
     );
 
-    this.notify();
+    this.notify('DELETE_MEMBER', { memberId, member: target });
     return true;
   }
 
@@ -651,7 +720,7 @@ class StorageService {
       '/members'
     );
 
-    this.notify();
+    this.notify('REGISTER_MEMBER', newMember);
     return newMember;
   }
 
@@ -705,7 +774,7 @@ class StorageService {
     const user = this.getCurrentUser();
     this.addAuditLog(user.id, user.name, user.role, `MEMBER_STATUS_${status}`, 'MEMBER', memberId, `Mengubah status anggota ${member.fullName} menjadi ${status}`);
 
-    this.notify();
+    this.notify('UPDATE_MEMBER_STATUS', member);
     return member;
   }
 
@@ -763,7 +832,7 @@ class StorageService {
     const user = this.getCurrentUser();
     this.addAuditLog(user.id, user.name, user.role, 'MEMBER_LOCATION_TRANSFER', 'MEMBER', memberId, `Memindahkan anggota ${member.fullName} dari ${prevBranch} ke ${newBranch.name}`);
 
-    this.notify();
+    this.notify('TRANSFER_MEMBER', member);
     return member;
   }
 
@@ -788,7 +857,7 @@ class StorageService {
         localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(currentUser));
       }
 
-      this.notify();
+      this.notify('UPDATE_MEMBER_PROFILE', member);
     }
   }
 
@@ -890,7 +959,7 @@ class StorageService {
       '/my-card'
     );
 
-    this.notify();
+    this.notify('ADMIN_UPDATE_MEMBER', updatedMember);
     return updatedMember;
   }
 
@@ -940,7 +1009,7 @@ class StorageService {
       '/my-card'
     );
 
-    this.notify();
+    this.notify('UPDATE_MEMBER_PHOTO', member);
     return member;
   }
 
@@ -1028,7 +1097,7 @@ class StorageService {
       '/tours'
     );
 
-    this.notify();
+    this.notify('CREATE_TOUR', newTour);
     return newTour;
   }
 
@@ -1058,7 +1127,7 @@ class StorageService {
       `Pembaruan data paket wisata "${updated.title}" oleh ${currentUser.name}`
     );
 
-    this.notify();
+    this.notify('UPDATE_TOUR', updated);
     return updated;
   }
 
@@ -1081,7 +1150,7 @@ class StorageService {
     const user = this.getCurrentUser();
     this.addAuditLog(user.id, user.name, user.role, `TOUR_MODERATED_${status}`, 'TOUR_PACKAGE', tourId, `Moderasi paket wisata "${tours[idx].title}" menjadi ${status}`);
 
-    this.notify();
+    this.notify('UPDATE_TOUR', tours[idx]);
   }
 
   public updateTourStatus(tourId: string, status: TourStatus, reviewerName?: string, rejectionReason?: string) {
@@ -1108,7 +1177,7 @@ class StorageService {
       `Menghapus paket wisata: "${target.title}"`
     );
 
-    this.notify();
+    this.notify('DELETE_TOUR', { tourId, tour: target });
     return true;
   }
 
@@ -1269,7 +1338,7 @@ class StorageService {
       `Mengunggah agenda kegiatan baru: "${newActivity.title}" (Skala: ${newActivity.organizerLevel} - ${newActivity.provinceName})`
     );
 
-    this.notify();
+    this.notify('CREATE_ACTIVITY', newActivity);
     return newActivity;
   }
 
@@ -1306,7 +1375,7 @@ class StorageService {
       `Memperbarui agenda kegiatan: "${activities[idx].title}"`
     );
 
-    this.notify();
+    this.notify('UPDATE_ACTIVITY', activities[idx]);
     return activities[idx];
   }
 
@@ -1329,7 +1398,7 @@ class StorageService {
       `Menghapus agenda kegiatan: "${act.title}"`
     );
 
-    this.notify();
+    this.notify('DELETE_ACTIVITY', { activityId, activity: act });
     return true;
   }
 
@@ -1527,7 +1596,7 @@ class StorageService {
       '/dashboard'
     );
 
-    this.notify();
+    this.notify('CREATE_CULINARY', newItem);
     return newItem;
   }
 
@@ -1564,7 +1633,7 @@ class StorageService {
       '/dashboard'
     );
 
-    this.notify();
+    this.notify('UPDATE_CULINARY', item);
     return item;
   }
 
@@ -1601,7 +1670,7 @@ class StorageService {
       '/dashboard'
     );
 
-    this.notify();
+    this.notify('UPDATE_CULINARY', item);
     return item;
   }
 
@@ -1633,7 +1702,7 @@ class StorageService {
       `Pembaruan data produk "${updated.name}" oleh ${currentUser.name}`
     );
 
-    this.notify();
+    this.notify('UPDATE_CULINARY', updated);
     return updated;
   }
 
@@ -1655,7 +1724,7 @@ class StorageService {
       `Penghapusan data ${target.kind} "${target.name}" oleh ${currentUser.name}`
     );
 
-    this.notify();
+    this.notify('DELETE_CULINARY', { id, item: target });
     return true;
   }
 
