@@ -25,10 +25,14 @@ import {
   Link as LinkIcon,
   Image as ImageIcon,
   FolderOpen,
-  ExternalLink
+  ExternalLink,
+  Plus,
+  Trash2,
+  Check,
+  Clock
 } from 'lucide-react';
 import { storage } from '../../services/storage';
-import { Member, CurrentUser, Province, Regency, District, Branch, KridaType, MemberStatus } from '../../types';
+import { Member, CurrentUser, Province, Regency, District, Branch, KridaType, MemberStatus, MemberSkill, SkillProficiency, Skill } from '../../types';
 import { formatDriveImageUrl, getDriveDirectFallbackUrl, getValidAvatarUrl } from '../common/SakaLogo';
 import { GOOGLE_DRIVE_MAIN_FOLDER } from '../../services/driveRepository';
 
@@ -137,7 +141,22 @@ export const AdminEditMemberModal: React.FC<AdminEditMemberModalProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Active Tab
-  const [activeTab, setActiveTab] = useState<'IDENTITY' | 'PHOTO' | 'DOMICILE' | 'SAKA' | 'REASON'>('IDENTITY');
+  const [activeTab, setActiveTab] = useState<'IDENTITY' | 'PHOTO' | 'DOMICILE' | 'SAKA' | 'SKILLS' | 'REASON'>('IDENTITY');
+
+  // Skills & Competencies State
+  const [memberSkills, setMemberSkills] = useState<MemberSkill[]>([]);
+  const [masterSkills, setMasterSkills] = useState<Skill[]>([]);
+  const [isAddingSkillInline, setIsAddingSkillInline] = useState(false);
+  const [selectedMasterSkillId, setSelectedMasterSkillId] = useState('CUSTOM');
+  const [newSkillName, setNewSkillName] = useState('');
+  const [newSkillCategory, setNewSkillCategory] = useState('Pemanduan & Tour Guide');
+  const [newSkillProficiency, setNewSkillProficiency] = useState<SkillProficiency>('INTERMEDIATE');
+  const [newSkillYears, setNewSkillYears] = useState(2);
+  const [newSkillPortfolio, setNewSkillPortfolio] = useState('');
+  const [newSkillCertNo, setNewSkillCertNo] = useState('');
+  const [newSkillCertIssuer, setNewSkillCertIssuer] = useState('');
+  const [newSkillCertFile, setNewSkillCertFile] = useState('');
+  const [newSkillIsVerified, setNewSkillIsVerified] = useState(true);
 
   // Handle Photo File Upload
   const handlePhotoFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -205,6 +224,9 @@ export const AdminEditMemberModal: React.FC<AdminEditMemberModalProps> = ({
       setNationalMemberNumber(member.nationalMemberNumber || '');
       setAutoRegenerateNta(false);
       setUpdateReason('Koreksi data profil dan domisili anggota oleh Operator');
+      setMemberSkills(member.skills ? [...member.skills] : []);
+      setMasterSkills(storage.getSkills());
+      setIsAddingSkillInline(false);
       setActiveTab('IDENTITY');
     }
   }, [member, isOpen]);
@@ -271,6 +293,73 @@ export const AdminEditMemberModal: React.FC<AdminEditMemberModalProps> = ({
     }
   };
 
+  const handleSelectMasterSkillInline = (id: string) => {
+    setSelectedMasterSkillId(id);
+    if (id === 'CUSTOM') {
+      setNewSkillName('');
+    } else {
+      const found = masterSkills.find(s => s.id === id);
+      if (found) {
+        setNewSkillName(found.name);
+        setNewSkillCategory(found.category);
+      }
+    }
+  };
+
+  const handleAddSkillInline = () => {
+    if (!newSkillName.trim()) {
+      alert('Mohon masukkan nama keahlian terlebih dahulu.');
+      return;
+    }
+    const newSkill: MemberSkill = {
+      id: `skill-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      skillId: selectedMasterSkillId !== 'CUSTOM' ? selectedMasterSkillId : `custom-${Date.now()}`,
+      skillName: newSkillName.trim(),
+      category: newSkillCategory,
+      proficiency: newSkillProficiency,
+      yearsOfExperience: Number(newSkillYears) || 1,
+      portfolioUrl: newSkillPortfolio.trim() || undefined,
+      certificateNumber: newSkillCertNo.trim() || undefined,
+      certificateIssuer: newSkillCertIssuer.trim() || undefined,
+      certificateFileUrl: newSkillCertFile.trim() || undefined,
+      isVerified: newSkillIsVerified,
+      verifiedBy: newSkillIsVerified ? currentUser.name : undefined,
+      verifiedAt: newSkillIsVerified ? new Date().toISOString() : undefined
+    };
+
+    setMemberSkills(prev => [...prev, newSkill]);
+    setIsAddingSkillInline(false);
+    setSelectedMasterSkillId('CUSTOM');
+    setNewSkillName('');
+    setNewSkillCategory('Pemanduan & Tour Guide');
+    setNewSkillProficiency('INTERMEDIATE');
+    setNewSkillYears(2);
+    setNewSkillPortfolio('');
+    setNewSkillCertNo('');
+    setNewSkillCertIssuer('');
+    setNewSkillCertFile('');
+    setNewSkillIsVerified(true);
+  };
+
+  const handleToggleSkillVerification = (skillId: string) => {
+    setMemberSkills(prev => prev.map(s => {
+      if (s.id === skillId) {
+        const nextVerified = !s.isVerified;
+        return {
+          ...s,
+          isVerified: nextVerified,
+          verifiedBy: nextVerified ? currentUser.name : undefined,
+          verifiedAt: nextVerified ? new Date().toISOString() : undefined
+        };
+      }
+      return s;
+    }));
+  };
+
+  const handleDeleteSkillInline = (skillId: string) => {
+    setMemberSkills(prev => prev.filter(s => s.id !== skillId));
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -334,7 +423,8 @@ export const AdminEditMemberModal: React.FC<AdminEditMemberModalProps> = ({
 
         avatarUrl: avatarUrl.trim() || member.avatarUrl,
 
-        nationalMemberNumber: finalNta || member.nationalMemberNumber
+        nationalMemberNumber: finalNta || member.nationalMemberNumber,
+        skills: memberSkills
       };
 
       const result = storage.adminUpdateMember(
@@ -510,6 +600,24 @@ export const AdminEditMemberModal: React.FC<AdminEditMemberModalProps> = ({
 
           <button
             type="button"
+            onClick={() => setActiveTab('SKILLS')}
+            className={`px-4 py-2.5 text-xs font-bold border-b-2 transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
+              activeTab === 'SKILLS'
+                ? 'border-purple-900 text-purple-950 bg-white rounded-t-xl shadow-xs'
+                : 'border-transparent text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+            <span>5. Keahlian & Talenta</span>
+            {memberSkills.length > 0 && (
+              <span className="px-1.5 py-0.5 bg-purple-100 text-purple-900 rounded-full text-[10px] font-bold">
+                {memberSkills.length}
+              </span>
+            )}
+          </button>
+
+          <button
+            type="button"
             onClick={() => setActiveTab('REASON')}
             className={`px-4 py-2.5 text-xs font-bold border-b-2 transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
               activeTab === 'REASON'
@@ -518,7 +626,7 @@ export const AdminEditMemberModal: React.FC<AdminEditMemberModalProps> = ({
             }`}
           >
             <FileText className="w-3.5 h-3.5" />
-            <span>5. Catatan Perubahan</span>
+            <span>6. Catatan Perubahan</span>
           </button>
         </div>
 
@@ -1056,7 +1164,275 @@ export const AdminEditMemberModal: React.FC<AdminEditMemberModalProps> = ({
             </div>
           )}
 
-          {/* TAB 4: CATATAN PERUBAHAN & AUDIT TRAIL */}
+          {/* TAB 5: KEAHLIAN & SERTIFIKASI */}
+          {activeTab === 'SKILLS' && (
+            <div className="space-y-5 animate-in fade-in duration-100">
+              <div className="bg-gradient-to-r from-purple-900 to-indigo-900 text-white p-4 rounded-2xl flex items-center justify-between shadow-xs">
+                <div>
+                  <h4 className="font-bold text-sm font-heading flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-amber-400" />
+                    <span>Direktori Keahlian & Talent Pool Anggota</span>
+                  </h4>
+                  <p className="text-[11px] text-purple-200 mt-0.5">
+                    Kelola data keahlian, sertifikasi kompetensi, serta persetujuan resmi Kwartir.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsAddingSkillInline(!isAddingSkillInline)}
+                  className="px-3 py-1.5 bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold rounded-xl text-xs flex items-center gap-1.5 transition-all shadow-xs cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>{isAddingSkillInline ? 'Tutup Form' : 'Tambah Keahlian'}</span>
+                </button>
+              </div>
+
+              {/* Inline Add Skill Form */}
+              {isAddingSkillInline && (
+                <div className="p-4 bg-purple-50/70 border border-purple-200 rounded-2xl space-y-4">
+                  <h5 className="font-bold text-purple-950 text-xs flex items-center gap-1.5">
+                    <Plus className="w-3.5 h-3.5 text-purple-700" />
+                    <span>Input Keahlian & Sertifikat Baru</span>
+                  </h5>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                    <div>
+                      <label className="block font-bold text-slate-800 mb-1">Pilih dari Master Keahlian Standar</label>
+                      <select
+                        value={selectedMasterSkillId}
+                        onChange={(e) => handleSelectMasterSkillInline(e.target.value)}
+                        className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl outline-none font-medium text-slate-800"
+                      >
+                        <option value="CUSTOM">-- Input Manual / Keahlian Khusus --</option>
+                        {masterSkills.map(ms => (
+                          <option key={ms.id} value={ms.id}>{ms.name} ({ms.category})</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block font-bold text-slate-800 mb-1">Nama Keahlian / Kompetensi <span className="text-rose-500">*</span></label>
+                      <input
+                        type="text"
+                        value={newSkillName}
+                        onChange={(e) => setNewSkillName(e.target.value)}
+                        placeholder="Contoh: Pemandu Wisata Arung Jeram / Fotografi Budaya"
+                        className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl outline-none font-medium text-slate-800"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block font-bold text-slate-800 mb-1">Kategori Bidang</label>
+                      <select
+                        value={newSkillCategory}
+                        onChange={(e) => setNewSkillCategory(e.target.value)}
+                        className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl outline-none font-medium text-slate-800"
+                      >
+                        <option value="Pemanduan & Tour Guide">Pemanduan & Tour Guide</option>
+                        <option value="Hospitality & Layanan Wisata">Hospitality & Layanan Wisata</option>
+                        <option value="Fotografi & Videografi Wisata">Fotografi & Videografi Wisata</option>
+                        <option value="Promosi & Digital Marketing Pariwisata">Promosi & Digital Marketing Pariwisata</option>
+                        <option value="Konservasi, Ekowisata & Alam">Konservasi, Ekowisata & Alam</option>
+                        <option value="Kuliner Tradisional & Kriya">Kuliner Tradisional & Kriya</option>
+                        <option value="Event, MICE & Atraksi Budaya">Event, MICE & Atraksi Budaya</option>
+                        <option value="Kepramukaan & Kepemimpinan Saka">Kepramukaan & Kepemimpinan Saka</option>
+                        <option value="Keahlian Khusus Lainnya">Keahlian Khusus Lainnya</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block font-bold text-slate-800 mb-1">Tingkat Kemahiran (Proficiency)</label>
+                      <select
+                        value={newSkillProficiency}
+                        onChange={(e) => setNewSkillProficiency(e.target.value as SkillProficiency)}
+                        className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl outline-none font-medium text-slate-800"
+                      >
+                        <option value="BEGINNER">BEGINNER (Dasar / Pemula)</option>
+                        <option value="INTERMEDIATE">INTERMEDIATE (Menengah / Terampil)</option>
+                        <option value="ADVANCED">ADVANCED (Mahir / Berpengalaman)</option>
+                        <option value="EXPERT">EXPERT (Ahli / Instruktur / Asesor)</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block font-bold text-slate-800 mb-1">Pengalaman (Tahun)</label>
+                      <input
+                        type="number"
+                        min={1}
+                        max={40}
+                        value={newSkillYears}
+                        onChange={(e) => setNewSkillYears(Number(e.target.value))}
+                        className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl outline-none font-medium text-slate-800"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block font-bold text-slate-800 mb-1">Nomor Sertifikat / Lisensi (Opsional)</label>
+                      <input
+                        type="text"
+                        value={newSkillCertNo}
+                        onChange={(e) => setNewSkillCertNo(e.target.value)}
+                        placeholder="Contoh: BNSP-PAR-2024-9988"
+                        className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl outline-none font-medium text-slate-800"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block font-bold text-slate-800 mb-1">Lembaga Penerbit Sertifikat (Opsional)</label>
+                      <input
+                        type="text"
+                        value={newSkillCertIssuer}
+                        onChange={(e) => setNewSkillCertIssuer(e.target.value)}
+                        placeholder="Contoh: LSP Pariwisata / BNSP / Dispar"
+                        className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl outline-none font-medium text-slate-800"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block font-bold text-slate-800 mb-1">Link Portofolio / Berkas Pendukung (Opsional)</label>
+                      <input
+                        type="url"
+                        value={newSkillPortfolio}
+                        onChange={(e) => setNewSkillPortfolio(e.target.value)}
+                        placeholder="https://drive.google.com/... atau link website"
+                        className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl outline-none font-medium text-slate-800"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="p-3 bg-white rounded-xl border border-purple-200 flex items-center justify-between">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={newSkillIsVerified}
+                        onChange={(e) => setNewSkillIsVerified(e.target.checked)}
+                        className="w-4 h-4 rounded text-purple-600 focus:ring-purple-500"
+                      />
+                      <span className="font-bold text-slate-800 text-xs">
+                        Langsung Setujui & Verifikasi Keahlian Ini (Disetujui Kwartir)
+                      </span>
+                    </label>
+
+                    <button
+                      type="button"
+                      onClick={handleAddSkillInline}
+                      className="px-4 py-1.5 bg-purple-900 hover:bg-purple-950 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"
+                    >
+                      Tambahkan ke Daftar
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Skills List */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-bold text-slate-700 uppercase tracking-wider">
+                    Daftar Keahlian ({memberSkills.length}):
+                  </span>
+                  <span className="text-[11px] text-slate-500">
+                    Klik tombol centang untuk menyetujui / membatalkan verifikasi
+                  </span>
+                </div>
+
+                {memberSkills.length === 0 ? (
+                  <div className="bg-slate-50 border border-slate-200 rounded-2xl p-8 text-center text-slate-400 space-y-2">
+                    <Award className="w-8 h-8 mx-auto text-slate-300" />
+                    <p className="font-bold text-xs text-slate-600">Belum ada keahlian terdaftar untuk anggota ini.</p>
+                    <p className="text-[11px] text-slate-400">Klik "Tambah Keahlian" di atas untuk menambahkan portofolio kompetensi.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2.5">
+                    {memberSkills.map((sk) => (
+                      <div
+                        key={sk.id}
+                        className={`p-3.5 rounded-2xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                          sk.isVerified 
+                            ? 'bg-emerald-50/50 border-emerald-200' 
+                            : 'bg-amber-50/50 border-amber-200'
+                        }`}
+                      >
+                        <div className="space-y-1 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-bold text-slate-900 text-xs">{sk.skillName}</span>
+                            <span className="px-2 py-0.5 bg-white border border-slate-200 rounded-md text-[10px] font-semibold text-slate-700">
+                              {sk.proficiency}
+                            </span>
+                            <span className="text-[10px] text-slate-500 font-medium">
+                              {sk.yearsOfExperience || 1} Th Pengalaman
+                            </span>
+                            {sk.isVerified ? (
+                              <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-md text-[10px] font-bold flex items-center gap-1">
+                                <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                <span>Disetujui Kwartir</span>
+                              </span>
+                            ) : (
+                              <span className="px-2 py-0.5 bg-amber-100 text-amber-800 border border-amber-300 rounded-md text-[10px] font-bold flex items-center gap-1">
+                                <Clock className="w-3 h-3 text-amber-600" />
+                                <span>Menunggu Persetujuan</span>
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="flex items-center gap-3 text-[11px] text-slate-600 flex-wrap">
+                            <span className="text-slate-400">Kategori: <strong>{sk.category}</strong></span>
+                            {sk.certificateNumber && (
+                              <span>• No Sertifikat: <strong className="font-mono text-purple-900">{sk.certificateNumber}</strong> ({sk.certificateIssuer || 'Lembaga Terkait'})</span>
+                            )}
+                            {sk.portfolioUrl && (
+                              <a
+                                href={sk.portfolioUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-purple-700 hover:text-purple-900 flex items-center gap-0.5 underline font-medium"
+                              >
+                                <span>Portofolio</span>
+                                <ExternalLink className="w-3 h-3" />
+                              </a>
+                            )}
+                          </div>
+
+                          {sk.verifiedBy && (
+                            <p className="text-[10px] text-emerald-700 font-medium">
+                              Diverifikasi oleh: {sk.verifiedBy} {sk.verifiedAt ? `(${new Date(sk.verifiedAt).toLocaleDateString('id-ID')})` : ''}
+                            </p>
+                          )}
+                        </div>
+
+                        {/* Actions */}
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => handleToggleSkillVerification(sk.id)}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1 transition-colors cursor-pointer ${
+                              sk.isVerified
+                                ? 'bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300'
+                                : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs'
+                            }`}
+                            title={sk.isVerified ? 'Batalkan status persetujuan' : 'Setujui keahlian ini'}
+                          >
+                            <Check className="w-3.5 h-3.5" />
+                            <span>{sk.isVerified ? 'Batal Setujui' : 'Setujui Keahlian'}</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteSkillInline(sk.id)}
+                            className="p-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-xl border border-rose-200 transition-colors cursor-pointer"
+                            title="Hapus keahlian dari daftar"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* TAB 6: CATATAN PERUBAHAN & AUDIT TRAIL */}
           {activeTab === 'REASON' && (
             <div className="space-y-4 animate-in fade-in duration-100">
               <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">

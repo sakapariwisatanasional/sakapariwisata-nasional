@@ -10,6 +10,8 @@ import {
   District, 
   Branch, 
   Skill,
+  MemberSkill,
+  Certification,
   NotificationItem,
   MemberStatus,
   TourStatus,
@@ -544,6 +546,176 @@ class StorageService {
     return MASTER_SKILLS;
   }
 
+  public updateMemberSkills(
+    memberId: string,
+    skills: MemberSkill[],
+    certifications?: Certification[],
+    user?: CurrentUser,
+    reason: string = 'Pembaruan data keahlian & sertifikasi kompetensi anggota'
+  ): Member | null {
+    const members = this.getMembers();
+    const idx = members.findIndex(m => m.id === memberId);
+    if (idx === -1) return null;
+
+    const member = members[idx];
+    member.skills = skills;
+    if (certifications) {
+      member.certifications = certifications;
+    }
+
+    members[idx] = member;
+    localStorage.setItem(STORAGE_KEYS.MEMBERS, JSON.stringify(members));
+
+    if (user) {
+      this.addAuditLog(
+        user.id,
+        user.name,
+        user.role,
+        'UPDATE_MEMBER_SKILLS',
+        'MEMBER',
+        member.id,
+        `${user.name} (${user.role}) memperbarui data keahlian & kompetensi ${member.fullName}: ${skills.length} keahlian terdaftar (${skills.filter(s => s.isVerified).length} disetujui/terverifikasi). Alasan: ${reason}`
+      );
+    }
+
+    this.notify('UPDATE_MEMBER_SKILLS', member);
+    return member;
+  }
+
+  public approveMemberSkill(
+    memberId: string,
+    skillId: string,
+    user: CurrentUser,
+    notes?: string
+  ): Member | null {
+    const members = this.getMembers();
+    const idx = members.findIndex(m => m.id === memberId);
+    if (idx === -1) return null;
+
+    const member = members[idx];
+    const skillIdx = (member.skills || []).findIndex(s => s.id === skillId);
+    if (skillIdx === -1) return null;
+
+    member.skills[skillIdx].isVerified = true;
+    member.skills[skillIdx].verifiedBy = user.name;
+    member.skills[skillIdx].verifiedAt = new Date().toISOString();
+    if (notes) {
+      member.skills[skillIdx].notes = notes;
+    }
+
+    members[idx] = member;
+    localStorage.setItem(STORAGE_KEYS.MEMBERS, JSON.stringify(members));
+
+    this.addAuditLog(
+      user.id,
+      user.name,
+      user.role,
+      'APPROVE_MEMBER_SKILL',
+      'MEMBER',
+      member.id,
+      `${user.name} (${user.role}) menyetujui dan memverifikasi keahlian "${member.skills[skillIdx].skillName}" untuk ${member.fullName} (${member.regencyName})`
+    );
+
+    // Send notification to the member
+    this.addNotification(
+      member.userId,
+      'Keahlian Telah Disetujui & Masuk Talent Pool',
+      `Selamat! Keahlian "${member.skills[skillIdx].skillName}" Anda telah disetujui dan diverifikasi oleh ${user.name} (${user.role}). Profil Anda kini tampil resmi di Direktori Keahlian & Talent Pool Pariwisata.`,
+      'SUCCESS',
+      '/skills'
+    );
+
+    this.notify('UPDATE_MEMBER_SKILLS', member);
+    return member;
+  }
+
+  public rejectOrDeleteMemberSkill(
+    memberId: string,
+    skillId: string,
+    user: CurrentUser,
+    reason: string = 'Keahlian belum memenuhi kriteria portofolio atau dihapus'
+  ): Member | null {
+    const members = this.getMembers();
+    const idx = members.findIndex(m => m.id === memberId);
+    if (idx === -1) return null;
+
+    const member = members[idx];
+    const removedSkill = (member.skills || []).find(s => s.id === skillId);
+    member.skills = (member.skills || []).filter(s => s.id !== skillId);
+
+    members[idx] = member;
+    localStorage.setItem(STORAGE_KEYS.MEMBERS, JSON.stringify(members));
+
+    this.addAuditLog(
+      user.id,
+      user.name,
+      user.role,
+      'DELETE_MEMBER_SKILL',
+      'MEMBER',
+      member.id,
+      `${user.name} (${user.role}) menghapus/menolak keahlian "${removedSkill?.skillName || skillId}" milik ${member.fullName}. Catatan: ${reason}`
+    );
+
+    this.notify('UPDATE_MEMBER_SKILLS', member);
+    return member;
+  }
+
+  public addMemberSkill(
+    memberId: string,
+    skillData: Omit<MemberSkill, 'id'>,
+    user: CurrentUser,
+    autoApprove?: boolean
+  ): Member | null {
+    const members = this.getMembers();
+    const idx = members.findIndex(m => m.id === memberId);
+    if (idx === -1) return null;
+
+    const member = members[idx];
+    const newSkill: MemberSkill = {
+      ...skillData,
+      id: `skill-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      isVerified: autoApprove !== undefined ? autoApprove : (user.role !== 'MEMBER' && user.role !== 'PUBLIC'),
+      verifiedBy: autoApprove || (user.role !== 'MEMBER' && user.role !== 'PUBLIC') ? user.name : undefined,
+      verifiedAt: autoApprove || (user.role !== 'MEMBER' && user.role !== 'PUBLIC') ? new Date().toISOString() : undefined
+    };
+
+    if (!member.skills) {
+      member.skills = [];
+    }
+    member.skills.push(newSkill);
+
+    // If certification is provided, also sync to certifications array
+    if (newSkill.certificateNumber) {
+      if (!member.certifications) member.certifications = [];
+      member.certifications.push({
+        id: `cert-${Date.now()}`,
+        memberId: member.id,
+        name: newSkill.certificateIssuer ? `${newSkill.skillName} (${newSkill.certificateIssuer})` : newSkill.skillName,
+        certNumber: newSkill.certificateNumber,
+        issuer: newSkill.certificateIssuer || 'BNSP / Lembaga Sertifikasi Profesi',
+        issueDate: new Date().toISOString().split('T')[0],
+        fileUrl: newSkill.certificateFileUrl,
+        isVerified: newSkill.isVerified
+      });
+    }
+
+    members[idx] = member;
+    localStorage.setItem(STORAGE_KEYS.MEMBERS, JSON.stringify(members));
+
+    this.addAuditLog(
+      user.id,
+      user.name,
+      user.role,
+      'ADD_MEMBER_SKILL',
+      'MEMBER',
+      member.id,
+      `${user.name} (${user.role}) menambahkan keahlian "${newSkill.skillName}" (${newSkill.proficiency}) untuk ${member.fullName}`
+    );
+
+    this.notify('UPDATE_MEMBER_SKILLS', member);
+    return member;
+  }
+
   // --- Members & Generator ---
   public getMembers(): Member[] {
     try {
@@ -1011,28 +1183,6 @@ class StorageService {
 
     this.notify('UPDATE_MEMBER_PHOTO', member);
     return member;
-  }
-
-  public addMemberSkill(memberId: string, skill: { skillId: string; proficiency: SkillProficiency; years: number; portfolio?: string }) {
-    const members = this.getMembers();
-    const member = members.find(m => m.id === memberId);
-    if (!member) return;
-
-    const masterSkill = this.getSkills().find(s => s.id === skill.skillId);
-    if (!masterSkill) return;
-
-    member.skills.push({
-      id: `ms-${Date.now()}`,
-      skillId: masterSkill.id,
-      skillName: masterSkill.name,
-      category: masterSkill.category,
-      proficiency: skill.proficiency,
-      yearsOfExperience: skill.years,
-      portfolioUrl: skill.portfolio,
-      isVerified: true
-    });
-
-    this.updateMemberProfile(member);
   }
 
   // --- Tour Packages ---

@@ -88,6 +88,12 @@ export interface MemberSkill {
   yearsOfExperience: number;
   portfolioUrl?: string;
   isVerified: boolean;
+  verifiedBy?: string;
+  verifiedAt?: string;
+  notes?: string;
+  certificateNumber?: string;
+  certificateIssuer?: string;
+  certificateFileUrl?: string;
 }
 
 export interface Certification {
