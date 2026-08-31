@@ -1,5 +1,7 @@
-import { Member, TourPackage, CulinarySouvenirItem, CurrentUser, UserRole } from '../types';
+import { Member, TourPackage, CulinarySouvenirItem, Activity, CurrentUser, UserRole, Certification, MemberSkill } from '../types';
 import { storage } from './storage';
+import { PROVINCES_DATA, REGENCIES_DATA } from '../data/indonesiaTerritories';
+import { MASTER_SKILLS } from '../data/initialData';
 
 export const DEFAULT_SPREADSHEET_ID = '1r3Lve_Rd1D4QqSP_ViCNzSZrIamJXEWh0lXSkU-EO8E';
 export const DEFAULT_SPREADSHEET_URL = `https://docs.google.com/spreadsheets/d/${DEFAULT_SPREADSHEET_ID}/edit?usp=sharing`;
@@ -162,21 +164,46 @@ class SpreadsheetService {
     // Daftar variasi nama sheet yang mungkin digunakan
     const sheetCandidates: string[] = [sheetName];
     if (sheetName.toLowerCase().includes('anggota')) {
-      sheetCandidates.push('Data Anggota', 'Data_Anggota', 'Members', 'Anggota Saka', 'Pendaftaran', 'Form Responses 1', 'Respon Formulir 1', '');
+      sheetCandidates.push(
+        'Data Anggota',
+        'Data_Anggota',
+        'Members',
+        'Anggota Saka',
+        'Pendaftaran',
+        'Form Responses 1',
+        'Respon Formulir 1',
+        'Form Responses',
+        'Respon Formulir',
+        'Sheet1',
+        'Sheet 1',
+        'Lembar1',
+        'Lembar 1',
+        'Data Member',
+        'Member',
+        ''
+      );
     } else if (sheetName.toLowerCase().includes('paket') || sheetName.toLowerCase().includes('wisata')) {
-      sheetCandidates.push('Paket_Wisata', 'Paket Wisata', 'Tours', 'Tour_Packages');
+      sheetCandidates.push('Paket_Wisata', 'Paket Wisata', 'Tours', 'Tour_Packages', 'Paket', 'Wisata');
     } else if (sheetName.toLowerCase().includes('kuliner') || sheetName.toLowerCase().includes('cinderamata')) {
-      sheetCandidates.push('Kuliner_Cinderamata', 'Kuliner & Cinderamata', 'Produk', 'Products', 'Souvenirs');
+      sheetCandidates.push('Kuliner_Cinderamata', 'Kuliner & Cinderamata', 'Produk', 'Products', 'Souvenirs', 'Kuliner', 'Cinderamata');
     } else if (sheetName.toLowerCase().includes('agenda') || sheetName.toLowerCase().includes('kegiatan')) {
-      sheetCandidates.push('Agenda_Kegiatan', 'Agenda & Kegiatan', 'Events', 'Activities');
+      sheetCandidates.push('Agenda_Kegiatan', 'Agenda & Kegiatan', 'Events', 'Activities', 'Agenda', 'Kegiatan');
     }
 
     for (const targetSheet of sheetCandidates) {
       try {
         const sheetParam = targetSheet ? `&sheet=${encodeURIComponent(targetSheet)}` : '';
-        const gvizUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:json${sheetParam}`;
+        const cacheBuster = `&_t=${Date.now()}&_rnd=${Math.floor(Math.random() * 1000000)}`;
+        const gvizUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:json${sheetParam}${cacheBuster}`;
         
-        const response = await fetch(gvizUrl);
+        const response = await fetch(gvizUrl, {
+          cache: 'no-store',
+          headers: {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0'
+          }
+        });
         if (!response.ok) continue;
 
         const text = await response.text();
@@ -198,7 +225,7 @@ class SpreadsheetService {
             const firstRowHasHeaders = cols.every(c => c.startsWith('col_') || !c) && 
               dataRows.length > 0 && 
               dataRows[0].c && 
-              dataRows[0].c.some((cell: any) => cell && typeof cell.v === 'string' && (cell.v.toLowerCase().includes('nama') || cell.v.toLowerCase().includes('kta') || cell.v.toLowerCase().includes('id')));
+              dataRows[0].c.some((cell: any) => cell && typeof cell.v === 'string' && (cell.v.toLowerCase().includes('nama') || cell.v.toLowerCase().includes('kta') || cell.v.toLowerCase().includes('id') || cell.v.toLowerCase().includes('email')));
 
             if (firstRowHasHeaders) {
               cols = dataRows[0].c.map((cell: any, idx: number) => {
@@ -230,8 +257,16 @@ class SpreadsheetService {
 
     // 2. Fallback: Coba CSV Export URL
     try {
-      const csvUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/export?format=csv&sheet=${encodeURIComponent(sheetName)}`;
-      const response = await fetch(csvUrl);
+      const csvCacheBuster = `&_t=${Date.now()}&_rnd=${Math.floor(Math.random() * 1000000)}`;
+      const csvUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/export?format=csv&sheet=${encodeURIComponent(sheetName)}${csvCacheBuster}`;
+      const response = await fetch(csvUrl, {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        }
+      });
       if (response.ok) {
         const csvText = await response.text();
         const parsed = this.parseCSV(csvText);
@@ -292,6 +327,52 @@ class SpreadsheetService {
   }
 
   /**
+   * Helper pencocokan wilayah (Provinsi & Kabupaten)
+   */
+  private resolveTerritory(rawProvince?: string, rawRegency?: string): {
+    provinceId: string;
+    provinceName: string;
+    regencyId: string;
+    regencyName: string;
+  } {
+    const cleanProv = (rawProvince || '').trim().toLowerCase().replace(/^(provinsi|kwarda|daerah)\s+/i, '');
+    const cleanReg = (rawRegency || '').trim().toLowerCase().replace(/^(kabupaten|kab\.|kota|kwarcab)\s+/i, '');
+
+    let foundProv = PROVINCES_DATA.find(p => 
+      p.name.toLowerCase() === cleanProv || 
+      p.name.toLowerCase().includes(cleanProv) || 
+      cleanProv.includes(p.name.toLowerCase())
+    );
+
+    if (!foundProv && rawProvince) {
+      if (cleanProv.includes('jabar') || cleanProv.includes('bandung')) foundProv = PROVINCES_DATA.find(p => p.id === '32');
+      else if (cleanProv.includes('jakarta') || cleanProv.includes('dki')) foundProv = PROVINCES_DATA.find(p => p.id === '31');
+      else if (cleanProv.includes('jatim') || cleanProv.includes('surabaya')) foundProv = PROVINCES_DATA.find(p => p.id === '35');
+      else if (cleanProv.includes('jateng') || cleanProv.includes('semarang')) foundProv = PROVINCES_DATA.find(p => p.id === '33');
+      else if (cleanProv.includes('jogja') || cleanProv.includes('yogyakarta')) foundProv = PROVINCES_DATA.find(p => p.id === '34');
+      else if (cleanProv.includes('bali') || cleanProv.includes('denpasar')) foundProv = PROVINCES_DATA.find(p => p.id === '51');
+    }
+
+    const provinceId = foundProv ? foundProv.id : '32';
+    const provinceName = foundProv ? foundProv.name : (rawProvince || 'Jawa Barat');
+
+    let foundReg = REGENCIES_DATA.find(r => 
+      (r.provinceId === provinceId || !foundProv) && 
+      (r.name.toLowerCase() === cleanReg || r.name.toLowerCase().includes(cleanReg) || cleanReg.includes(r.name.toLowerCase()))
+    );
+
+    const regencyId = foundReg ? foundReg.id : `${provinceId}.01`;
+    const regencyName = foundReg ? foundReg.name : (rawRegency || `Kwartir Cabang ${provinceName}`);
+
+    return {
+      provinceId,
+      provinceName,
+      regencyId,
+      regencyName
+    };
+  }
+
+  /**
    * Tarik data dari Google Spreadsheet dan perbarui state aplikasi
    */
   public async syncFromSpreadsheet(): Promise<{ success: boolean; count: number; message: string }> {
@@ -334,21 +415,105 @@ class SpreadsheetService {
 
         // Petakan baris spreadsheet ke model Member
         const importedMembers: Member[] = rows.map((row, idx) => {
-          const fullName = this.getRowValue(row, ['Nama Lengkap', 'nama_lengkap', 'Nama', 'nama', 'Full Name', 'fullname', 'Name', 'col_1']) || `Anggota ${idx + 1}`;
-          const kta = this.getRowValue(row, ['Nomor KTA', 'Nomor Anggota', 'nomor_kta', 'NTA', 'KTA', 'No KTA', 'No. KTA', 'Nomor NTA', 'col_2', 'col_0']);
-          const province = this.getRowValue(row, ['Provinsi', 'Kwarda', 'provinsi', 'Kwartir Daerah', 'Daerah', 'Province', 'col_3']) || 'Tingkat Nasional';
-          const regency = this.getRowValue(row, ['Kabupaten/Kota', 'Kwarcab', 'kabupaten', 'Kabupaten', 'Kota', 'Kwartir Cabang', 'col_4']) || 'Kwartir Nasional';
-          const branch = this.getRowValue(row, ['Kwarran/Kecamatan', 'Kwartir Ranting', 'Kwarran', 'kecamatan_ranting', 'Kecamatan', 'Ranting', 'col_5']) || 'Pimpinan Nasional';
-          const gudep = this.getRowValue(row, ['Gugus Depan', 'Gudep', 'gudep', 'Gugusdepan', 'col_6']) || 'Gudep Saka Pariwisata';
-          const krida = this.getRowValue(row, ['Krida', 'krida', 'Peminatan Krida', 'col_7']) || 'Krida Pemandu';
-          const statusRaw = (this.getRowValue(row, ['Status', 'status', 'col_8']) || 'ACTIVE').toUpperCase();
-          const phone = this.normalizePhoneNumber(this.getRowValue(row, ['Nomor WA', 'No WhatsApp', 'Nomor WhatsApp', 'No WA', 'WhatsApp', 'Telepon', 'Phone', 'col_9']));
-          const email = this.getRowValue(row, ['Email', 'email', 'E-mail', 'col_10']) || `member${idx + 1}@pramuka.id`;
-          const rawPhoto = this.getRowValue(row, ['Foto URL', 'foto_url', 'Foto', 'Pas Foto', 'Photo', 'Avatar', 'Link Foto', 'col_11']);
+          const fullName = this.getRowValue(row, [
+            'Nama Lengkap', 'nama_lengkap', 'Nama Lengkap (dengan Gelar)', 'Nama Lengkap & Gelar',
+            'Nama Anggota', 'Nama Peserta', 'Nama', 'nama', 'Full Name', 'fullname', 'Name', 'col_1'
+          ]) || `Anggota ${idx + 1}`;
+          
+          const kta = this.getRowValue(row, [
+            'Nomor KTA', 'Nomor Anggota', 'Nomor NTA', 'nomor_kta', 'NTA', 'KTA',
+            'No KTA', 'No. KTA', 'No NTA', 'No. NTA', 'Nomor Registrasi', 'col_2', 'col_0'
+          ]);
+          
+          const rawProv = this.getRowValue(row, [
+            'Kwartir Daerah (Provinsi)', 'Kwartir Daerah', 'Kwarda', 'Provinsi', 'provinsi',
+            'Daerah', 'Province', 'col_3'
+          ]) || 'Jawa Barat';
+          
+          const rawReg = this.getRowValue(row, [
+            'Kwartir Cabang (Kab/Kota)', 'Kwartir Cabang', 'Kwarcab', 'Kabupaten/Kota', 'kabupaten',
+            'Kabupaten', 'Kota', 'col_4'
+          ]) || 'Kota Bandung';
+          
+          const territory = this.resolveTerritory(rawProv, rawReg);
+
+          const branch = this.getRowValue(row, [
+            'Kwartir Ranting (Kecamatan)', 'Kwartir Ranting', 'Kwarran', 'Kwarran/Kecamatan',
+            'kecamatan_ranting', 'Kecamatan', 'Ranting', 'col_5'
+          ]) || 'Ranting Saka';
+          
+          const gudep = this.getRowValue(row, [
+            'Gugus Depan / Pangkalan', 'Gugus Depan', 'Gudep', 'gudep', 'Pangkalan',
+            'Sekolah / Pangkalan', 'Gugusdepan', 'col_6'
+          ]) || 'Gudep Saka Pariwisata';
+          
+          const kridaRaw = this.getRowValue(row, [
+            'Peminatan Krida Saka Pariwisata', 'Pilihan Krida', 'Krida Saka', 'Krida',
+            'krida', 'Peminatan Krida', 'col_7'
+          ]);
+          
+          let krida: any = 'Krida Pemandu';
+          if (kridaRaw.toLowerCase().includes('penyuluh')) krida = 'Krida Penyuluh';
+          else if (kridaRaw.toLowerCase().includes('mice') || kridaRaw.toLowerCase().includes('event')) krida = 'Krida Mice & Event';
+          else if (kridaRaw.toLowerCase().includes('kuliner') || kridaRaw.toLowerCase().includes('cinderamata') || kridaRaw.toLowerCase().includes('kriya')) krida = 'Krida Kuliner & Cinderamata';
+          else if (kridaRaw.toLowerCase().includes('pemandu') || kridaRaw.toLowerCase().includes('guide')) krida = 'Krida Pemandu';
+
+          const statusRaw = (this.getRowValue(row, ['Status', 'status', 'Status Keanggotaan', 'col_8']) || 'ACTIVE').toUpperCase();
+          const phone = this.normalizePhoneNumber(this.getRowValue(row, [
+            'Nomor WhatsApp', 'No WhatsApp', 'Nomor WA', 'No. WhatsApp', 'Nomor WhatsApp / HP',
+            'No WA', 'WhatsApp', 'Telepon', 'Phone', 'col_9'
+          ]));
+          
+          const email = this.getRowValue(row, ['Email', 'email', 'E-mail', 'Alamat Email', 'col_10']) || `member${idx + 1}@pramuka.id`;
+          const rawPhoto = this.getRowValue(row, [
+            'Foto URL', 'foto_url', 'Foto', 'Pas Foto', 'Pas Foto Resmi (KTA Digital)',
+            'Photo', 'Avatar', 'Link Foto', 'Upload Foto', 'col_11'
+          ]);
           const avatarUrl = this.cleanDriveImageUrl(rawPhoto) || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&fit=crop&q=80';
           const roleRaw = this.getRowValue(row, ['Role', 'Peran', 'Jabatan', 'Hak Akses', 'Wewenang', 'Posisi']);
-          const role = parseRole(roleRaw, province, regency);
-          const memberId = this.getRowValue(row, ['ID', 'id', 'Id', 'member_id', 'Nomor ID', 'col_0']) || `sheet-member-${idx}`;
+          const role = parseRole(roleRaw, rawProv, rawReg);
+          const memberId = this.getRowValue(row, ['ID', 'id', 'Id', 'member_id', 'Nomor ID', 'col_0']) || `sheet-member-${idx + 1}`;
+
+          // Ekstraksi Sertifikasi Kompetensi jika ada di spreadsheet
+          const rawCertName = this.getRowValue(row, [
+            'Sertifikat Kompetensi', 'Sertifikasi', 'Kompetensi', 'Sertifikat', 'Nama Sertifikat',
+            'Sertifikasi Kepemanduan / BNSP', 'Keahlian Tersertifikasi'
+          ]);
+          const rawCertNo = this.getRowValue(row, ['No. Sertifikat', 'Nomor Sertifikat', 'No Sertifikat', 'Nomor Registrasi BNSP']);
+          const rawCertIssuer = this.getRowValue(row, ['Lembaga Sertifikasi', 'Penerbit Sertifikat', 'LSP / BNSP', 'Institusi Penerbit']) || 'BNSP / Lembaga Sertifikasi Profesi Pariwisata';
+          const rawCertFile = this.cleanDriveImageUrl(this.getRowValue(row, ['File Sertifikat', 'Link Sertifikat', 'Upload Sertifikat', 'Bukti Sertifikat']));
+
+          const memberCerts: Certification[] = [];
+          const memberSkills: MemberSkill[] = [];
+
+          if (rawCertName) {
+            const certId = `cert-${memberId}-1`;
+            memberCerts.push({
+              id: certId,
+              memberId,
+              name: rawCertName,
+              certNumber: rawCertNo || `BNSP-SP-${Math.floor(100000 + Math.random() * 900000)}`,
+              issuer: rawCertIssuer,
+              issueDate: new Date().toISOString().split('T')[0],
+              fileUrl: rawCertFile || undefined,
+              isVerified: true
+            });
+
+            // Tambahkan skill turunan
+            memberSkills.push({
+              id: `skill-${memberId}-1`,
+              skillId: 'skill-tour-guide',
+              skillName: rawCertName,
+              category: krida === 'Krida Pemandu' ? 'Pemanduan & Tour Guide' : krida === 'Krida Penyuluh' ? 'Ekowisata & Alam' : krida === 'Krida Mice & Event' ? 'MICE & Event' : 'Hospitality & Kuliner',
+              proficiency: 'ADVANCED',
+              yearsOfExperience: 2,
+              portfolioUrl: rawCertFile || undefined,
+              isVerified: true
+            });
+          }
+
+          const rawGender = (this.getRowValue(row, ['Jenis Kelamin', 'Gender', 'JK', 'L/P']) || '').toUpperCase();
+          const gender = rawGender.startsWith('P') || rawGender.includes('PEREMPUAN') || rawGender.includes('WANITA') ? 'PEREMPUAN' : 'LAKI_LAKI';
 
           return {
             id: memberId,
@@ -357,35 +522,35 @@ class SpreadsheetService {
             fullName,
             nikMasked: '3201**********01',
             avatarUrl,
-            gender: 'LAKI_LAKI',
+            gender,
             birthPlace: 'Indonesia',
             birthDate: '2000-01-01',
             email,
             phone,
-            address: `${branch}, ${regency}, ${province}`,
-            provinceId: '00',
-            provinceName: province,
-            regencyId: '00.00',
-            regencyName: regency,
-            districtId: '00.00.00',
+            address: `${branch}, ${territory.regencyName}, ${territory.provinceName}`,
+            provinceId: territory.provinceId,
+            provinceName: territory.provinceName,
+            regencyId: territory.regencyId,
+            regencyName: territory.regencyName,
+            districtId: `${territory.regencyId}.01`,
             districtName: branch,
-            branchId: `branch-${idx}`,
+            branchId: `branch-${idx + 1}`,
             branchName: branch,
             gugusDepan: gudep,
             currentPosition: role === 'SUPER_ADMIN' ? 'Ketua Pimpinan Saka Pariwisata Nasional' : `Anggota ${krida}`,
-            krida: krida as any,
+            krida,
             joinYear: new Date().getFullYear(),
             educationLevel: 'SMA/SMK',
             occupation: 'Anggota Pramuka',
-            bio: `Anggota resmi Saka Pariwisata ${province}. Terdata langsung dari Google Spreadsheet.`,
+            bio: `Anggota resmi Saka Pariwisata ${territory.provinceName}. Terdata langsung dari Google Spreadsheet.`,
             status: statusRaw === 'ACTIVE' || statusRaw === 'PENDING' ? statusRaw : 'ACTIVE',
-            registeredAt: this.getRowValue(row, ['Tanggal Daftar', 'tanggal_daftar', 'Created At', 'Timestamp', 'col_13']) || new Date().toISOString(),
+            registeredAt: this.getRowValue(row, ['Tanggal Daftar', 'tanggal_daftar', 'Created At', 'Timestamp', 'Waktu Pendaftaran', 'col_13']) || new Date().toISOString(),
             verificationToken: `VERIFY-SP-${kta ? kta.replace(/\./g, '') : memberId}`,
             isOperator: role !== 'MEMBER',
             operatorRole: role !== 'MEMBER' ? role : undefined,
-            operatorJurisdictionName: role === 'SUPER_ADMIN' ? 'Kwartir Nasional' : role === 'ADMIN_PROVINCE' ? province : role === 'ADMIN_REGENCY' ? regency : role === 'ADMIN_BRANCH' ? branch : undefined,
-            skills: [],
-            certifications: [],
+            operatorJurisdictionName: role === 'SUPER_ADMIN' ? 'Kwartir Nasional' : role === 'ADMIN_PROVINCE' ? territory.provinceName : role === 'ADMIN_REGENCY' ? territory.regencyName : role === 'ADMIN_BRANCH' ? branch : undefined,
+            skills: memberSkills,
+            certifications: memberCerts,
             locationHistory: []
           };
         });
@@ -398,7 +563,7 @@ class SpreadsheetService {
           importedMembers.forEach((newM, idx) => {
             const rawRow = rows[idx] || {};
             const password = this.getRowValue(rawRow, ['Password', 'Kata Sandi', 'Kata_Sandi', 'password']);
-            const username = this.getRowValue(rawRow, ['Username', 'username']) || (newM.email ? newM.email.split('@')[0] : `user_${idx}`);
+            const username = this.getRowValue(rawRow, ['Username', 'username']) || (newM.email ? newM.email.split('@')[0] : `user_${idx + 1}`);
             const parsedRole = newM.operatorRole || 'MEMBER';
 
             // Cari apakah member sudah ada di database
@@ -587,6 +752,80 @@ class SpreadsheetService {
         }
       } catch (e) {
         console.warn('Culinary sync notice:', e);
+      }
+
+      // 4. Sinkronisasi Data Agenda & Kegiatan jika sheet tersedia
+      try {
+        const activityRows = await this.fetchSheetRows('Agenda_Kegiatan');
+        if (activityRows && activityRows.length > 0) {
+          const existingActivities = storage.getActivities();
+          const mergedActivities = [...existingActivities];
+
+          activityRows.forEach((row, idx) => {
+            const actId = this.getRowValue(row, ['ID', 'id', 'col_0']) || `act-sheet-${idx + 1}`;
+            const title = this.getRowValue(row, ['Judul Kegiatan', 'Nama Kegiatan', 'title', 'col_1']) || `Kegiatan Saka ${idx + 1}`;
+            const cat = this.getRowValue(row, ['Kategori', 'category', 'col_2']) || 'Pelatihan';
+            const levelRaw = (this.getRowValue(row, ['Tingkat', 'Level', 'organizerLevel', 'col_3']) || 'NASIONAL').toUpperCase();
+            let organizerLevel: any = 'NASIONAL';
+            if (levelRaw.includes('INTERNASIONAL')) organizerLevel = 'INTERNASIONAL';
+            else if (levelRaw.includes('PROVINSI') || levelRaw.includes('KWARDA')) organizerLevel = 'PROVINSI';
+            else if (levelRaw.includes('KABUPATEN') || levelRaw.includes('KWARCAB')) organizerLevel = 'KABUPATEN';
+            else if (levelRaw.includes('RANTING') || levelRaw.includes('KWARRAN')) organizerLevel = 'RANTING';
+
+            const organizer = this.getRowValue(row, ['Penyelenggara', 'organizerName', 'col_4']) || 'Pimpinan Saka Pariwisata';
+            const location = this.getRowValue(row, ['Lokasi', 'Tempat', 'locationName', 'col_5']) || 'Bumi Perkemahan';
+            const prov = this.getRowValue(row, ['Provinsi', 'province', 'provinceName', 'col_6']) || 'Jawa Barat';
+            const reg = this.getRowValue(row, ['Kabupaten/Kota', 'regency', 'regencyName', 'col_7']) || 'Kota Bandung';
+            const startD = this.parseGvizDate(this.getRowValue(row, ['Tanggal Mulai', 'startDate', 'col_8']));
+            const endD = this.parseGvizDate(this.getRowValue(row, ['Tanggal Selesai', 'endDate', 'col_9']));
+            const feeTypeRaw = (this.getRowValue(row, ['Biaya', 'feeType', 'col_10']) || 'GRATIS').toUpperCase();
+            const feeType: any = feeTypeRaw.includes('BERBAYAR') ? 'BERBAYAR' : feeTypeRaw.includes('SUBSIDI') ? 'SUBSIDI' : 'GRATIS';
+            const fee = parseFloat(this.getRowValue(row, ['Nominal Biaya', 'feeAmount', 'col_11'])) || 0;
+            const phone = this.normalizePhoneNumber(this.getRowValue(row, ['Kontak WA', 'phone', 'contactPhone', 'col_12']));
+            const banner = this.cleanDriveImageUrl(this.getRowValue(row, ['Banner URL', 'Foto', 'image', 'bannerUrl', 'col_13'])) || 'https://images.unsplash.com/photo-1517457373958-b7bdd4587205?w=1200&auto=format&fit=crop&q=80';
+            const desc = this.getRowValue(row, ['Deskripsi', 'description', 'col_14']) || `Kegiatan resmi Saka Pariwisata: ${title}. Terbuka untuk seluruh anggota dan insan kepariwisataan.`;
+
+            const actObj: Activity = {
+              id: actId,
+              title,
+              slug: actId,
+              description: desc,
+              bannerUrl: banner,
+              coverImage: banner,
+              category: cat,
+              organizerLevel,
+              organizerName: organizer,
+              locationName: location,
+              locationAddress: `${location}, ${reg}, ${prov}`,
+              provinceName: prov,
+              regencyName: reg,
+              startDate: startD,
+              endDate: endD,
+              timeString: '08:00 - 16:00 WIB',
+              capacity: 100,
+              registeredCount: 0,
+              isPublic: true,
+              status: 'OPEN_REGISTRATION',
+              requirements: ['Anggota Aktif Gerakan Pramuka / Saka Pariwisata', 'Membawa Seragam Pramuka Lengkap'],
+              contactPhone: phone,
+              feeType,
+              feeAmount: fee,
+              uploadedByName: 'Pimpinan Saka Pariwisata',
+              uploadedByRole: 'SUPER_ADMIN'
+            };
+
+            const existingIdx = mergedActivities.findIndex(a => a.id === actId || a.title.toLowerCase() === title.toLowerCase());
+            if (existingIdx !== -1) {
+              mergedActivities[existingIdx] = { ...mergedActivities[existingIdx], ...actObj };
+            } else {
+              mergedActivities.push(actObj);
+            }
+          });
+
+          storage.setActivities(mergedActivities);
+        }
+      } catch (e) {
+        console.warn('Activities sync notice:', e);
       }
 
       // Bersihkan duplikat database

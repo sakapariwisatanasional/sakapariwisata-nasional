@@ -13,13 +13,14 @@ import {
   ExternalLink,
   Link as LinkIcon
 } from 'lucide-react';
-import { TourCategory, TourOwnerType, TourItinerary, Province, Regency, CurrentUser } from '../../types';
+import { TourCategory, TourOwnerType, TourItinerary, Province, Regency, CurrentUser, TourPackage } from '../../types';
 import { storage } from '../../services/storage';
 import { GOOGLE_DRIVE_MAIN_FOLDER, formatGoogleDriveUrl } from '../../services/driveRepository';
 
 interface TourPackageFormModalProps {
   isOpen: boolean;
   currentUser: CurrentUser;
+  editTour?: TourPackage | null;
   onClose: () => void;
   onSuccess: () => void;
 }
@@ -27,6 +28,7 @@ interface TourPackageFormModalProps {
 export const TourPackageFormModal: React.FC<TourPackageFormModalProps> = ({
   isOpen,
   currentUser,
+  editTour,
   onClose,
   onSuccess
 }) => {
@@ -50,6 +52,7 @@ export const TourPackageFormModal: React.FC<TourPackageFormModalProps> = ({
   const [transportationType, setTransportationType] = useState('Shuttle / Mobil Antar-Jemput');
   const [contactPhone, setContactPhone] = useState('0812-3456-7890');
   const [contactEmail, setContactEmail] = useState('wisata@sakapariwisata.id');
+  const [status, setStatus] = useState<'SUBMITTED' | 'APPROVED_PUBLISHED' | 'REJECTED' | 'ARCHIVED'>('APPROVED_PUBLISHED');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [facilityList, setFacilityList] = useState<string[]>([
@@ -70,10 +73,64 @@ export const TourPackageFormModal: React.FC<TourPackageFormModalProps> = ({
   }, []);
 
   useEffect(() => {
+    if (editTour) {
+      setTitle(editTour.title || '');
+      setDescription(editTour.description || '');
+      setCategory(editTour.category || 'Wisata Alam');
+      setCoverImage(editTour.coverImage || 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=800&auto=format&fit=crop&q=80');
+      setSelectedProvinceId(editTour.provinceId || '32');
+      setSelectedRegencyId(editTour.regencyId || '32.06');
+      setLocationAddress(editTour.locationAddress || '');
+      setDurationDays(editTour.durationDays || 2);
+      setPricePerPerson(editTour.pricePerPerson || 350000);
+      setMinCapacity(editTour.minCapacity || 2);
+      setMaxCapacity(editTour.maxCapacity || 20);
+      setLodgingType(editTour.lodgingType || 'Homestay Desa Wisata');
+      setTransportationType(editTour.transportationType || 'Shuttle / Mobil Antar-Jemput');
+      setContactPhone(editTour.contactPhone || '0812-3456-7890');
+      setContactEmail(editTour.contactEmail || 'wisata@sakapariwisata.id');
+      setStatus(editTour.status || 'APPROVED_PUBLISHED');
+      if (editTour.facilities && editTour.facilities.length > 0) {
+        setFacilityList(editTour.facilities);
+      }
+      if (editTour.itinerary && editTour.itinerary.length > 0) {
+        setItineraries(editTour.itinerary);
+      }
+    } else {
+      setTitle('');
+      setDescription('');
+      setCategory('Wisata Alam');
+      setCoverImage('https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=800&auto=format&fit=crop&q=80');
+      setLocationAddress('');
+      setDurationDays(2);
+      setPricePerPerson(350000);
+      setMinCapacity(4);
+      setMaxCapacity(20);
+      setLodgingType('Homestay Desa Wisata');
+      setTransportationType('Shuttle / Mobil Antar-Jemput');
+      setContactPhone('0812-3456-7890');
+      setContactEmail('wisata@sakapariwisata.id');
+      setStatus('APPROVED_PUBLISHED');
+      setFacilityList([
+        'Pemandu Berlisensi Saka Pariwisata',
+        'Tiket Masuk Daya Tarik Wisata',
+        'Makan & Minum Tradisional',
+        'Dokumentasi Perjalanan'
+      ]);
+      setItineraries([
+        { day: 1, title: 'Kedatangan & Eksplorasi Kawasan Wisata', description: 'Briefing, sambutan hangat, dan jelajah destinasi utama.', timeRange: '08:00 - 17:00' },
+        { day: 2, title: 'Workshop Budaya & Kepulangan', description: 'Mencicipi kuliner khas, belanja cinderamata, dan foto bersama.', timeRange: '08:00 - 12:00' }
+      ]);
+    }
+  }, [editTour, isOpen]);
+
+  useEffect(() => {
     if (selectedProvinceId) {
       const regs = storage.getRegencies(selectedProvinceId);
       setRegencies(regs);
-      if (regs.length > 0) setSelectedRegencyId(regs[0].id);
+      if (regs.length > 0 && !regs.some(r => r.id === selectedRegencyId)) {
+        setSelectedRegencyId(regs[0].id);
+      }
     }
   }, [selectedProvinceId]);
 
@@ -91,6 +148,14 @@ export const TourPackageFormModal: React.FC<TourPackageFormModalProps> = ({
     'Heritage & Sejarah',
     'MICE & Event'
   ];
+
+  const isOperatorOrAdmin = [
+    'SUPER_ADMIN', 
+    'ADMIN_PROVINCE', 
+    'ADMIN_REGENCY', 
+    'ADMIN_BRANCH',
+    'OPERATOR'
+  ].includes(currentUser.role);
 
   const handleAddFacility = () => {
     if (newFacilityInput.trim()) {
@@ -141,42 +206,72 @@ export const TourPackageFormModal: React.FC<TourPackageFormModalProps> = ({
       currentUser.role === 'ADMIN_PROVINCE' ? 'PROVINCE' : 'PARTNER';
 
     try {
-      storage.createTourPackage({
-        title,
-        description,
-        category,
-        coverImage,
-        galleryImages: [],
-        ownerType,
-        ownerId: currentUser.memberId || currentUser.id,
-        ownerName: currentUser.name,
-        provinceId: selectedProvinceId,
-        provinceName: currentProvince?.name || 'Jawa Barat',
-        regencyId: selectedRegencyId,
-        regencyName: currentRegency?.name || 'Tasikmalaya',
-        districtName: 'Wilayah Terkait',
-        branchName: currentUser.jurisdictionName,
-        locationAddress,
-        durationDays,
-        pricePerPerson,
-        minCapacity,
-        maxCapacity,
-        facilities: facilityList,
-        lodgingType,
-        transportationType,
-        guideProvided: true,
-        contactPhone,
-        contactEmail,
-        itinerary: itineraries
-      });
+      if (editTour) {
+        storage.updateTourPackage(
+          editTour.id,
+          {
+            title,
+            description,
+            category,
+            coverImage,
+            provinceId: selectedProvinceId,
+            provinceName: currentProvince?.name || editTour.provinceName || 'Jawa Barat',
+            regencyId: selectedRegencyId,
+            regencyName: currentRegency?.name || editTour.regencyName || 'Tasikmalaya',
+            locationAddress,
+            durationDays,
+            pricePerPerson,
+            minCapacity,
+            maxCapacity,
+            facilities: facilityList,
+            lodgingType,
+            transportationType,
+            contactPhone,
+            contactEmail,
+            itinerary: itineraries,
+            status: isOperatorOrAdmin ? status : editTour.status
+          },
+          currentUser
+        );
+        alert(`Perubahan paket wisata "${title}" berhasil disimpan!`);
+      } else {
+        storage.createTourPackage({
+          title,
+          description,
+          category,
+          coverImage,
+          galleryImages: [],
+          ownerType,
+          ownerId: currentUser.memberId || currentUser.id,
+          ownerName: currentUser.name,
+          provinceId: selectedProvinceId,
+          provinceName: currentProvince?.name || 'Jawa Barat',
+          regencyId: selectedRegencyId,
+          regencyName: currentRegency?.name || 'Tasikmalaya',
+          districtName: 'Wilayah Terkait',
+          branchName: currentUser.jurisdictionName,
+          locationAddress,
+          durationDays,
+          pricePerPerson,
+          minCapacity,
+          maxCapacity,
+          facilities: facilityList,
+          lodgingType,
+          transportationType,
+          guideProvided: true,
+          contactPhone,
+          contactEmail,
+          itinerary: itineraries
+        });
+        alert('Paket wisata berhasil diajukan!');
+      }
 
-      alert('Paket wisata berhasil diajukan! Status awal adalah SUBMITTED dan akan ditinjau oleh Admin Pembina.');
       setIsSubmitting(false);
       onSuccess();
       onClose();
     } catch (err: any) {
       setIsSubmitting(false);
-      alert('Gagal mengajukan paket wisata: ' + err.message);
+      alert('Gagal memproses paket wisata: ' + err.message);
     }
   };
 

@@ -77,6 +77,7 @@ export default function App() {
   // Other Modals State
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
   const [isTourFormModalOpen, setIsTourFormModalOpen] = useState(false);
+  const [editingTour, setEditingTour] = useState<TourPackage | null>(null);
   const [isEditKtaModalOpen, setIsEditKtaModalOpen] = useState(false);
   const [isCulinaryFormOpen, setIsCulinaryFormOpen] = useState(false);
   const [editingCulinaryItem, setEditingCulinaryItem] = useState<CulinarySouvenirItem | null>(null);
@@ -94,7 +95,7 @@ export default function App() {
   const [selectedTourDetail, setSelectedTourDetail] = useState<TourPackage | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  // Synchronize state with reactive storage
+  // Synchronize state with reactive storage & auto-fetch live spreadsheet data on initial load
   useEffect(() => {
     const syncState = () => {
       setMembers(storage.getMembers());
@@ -108,7 +109,18 @@ export default function App() {
     };
 
     syncState();
-    return storage.subscribe(syncState);
+    const unsubscribe = storage.subscribe(syncState);
+
+    // Langsung tarik data terbaru dari Google Spreadsheet secara live tanpa menggunakan cache/history lama
+    spreadsheetService.syncFromSpreadsheet().then(res => {
+      if (res.success) {
+        console.log('Live Google Spreadsheet auto-sync completed:', res.message);
+      }
+    }).catch(err => {
+      console.warn('Initial live spreadsheet sync notice:', err);
+    });
+
+    return unsubscribe;
   }, []);
 
   // Handle URL Query Params & Pathname for KTA Barcode/QR Code live lookup
@@ -400,9 +412,16 @@ export default function App() {
                 tours={tours}
                 provinces={provinces}
                 members={members}
-                onOpenTourFormModal={() => setIsTourFormModalOpen(true)}
+                onOpenTourFormModal={() => {
+                  setEditingTour(null);
+                  setIsTourFormModalOpen(true);
+                }}
                 onViewTourDetail={(t) => setSelectedTourDetail(t)}
                 onOpenVerifyModal={(m) => setVerifyingMember(m)}
+                onEditTour={(t) => {
+                  setEditingTour(t);
+                  setIsTourFormModalOpen(true);
+                }}
               />
             )}
 
@@ -511,13 +530,18 @@ export default function App() {
         onSuccess={() => setTransferringMember(null)}
       />
 
-      {/* 6. Tour Package Creation Modal */}
+      {/* 6. Tour Package Creation & Edit Modal */}
       <TourPackageFormModal
         isOpen={isTourFormModalOpen}
         currentUser={currentUser}
-        onClose={() => setIsTourFormModalOpen(false)}
+        editTour={editingTour}
+        onClose={() => {
+          setIsTourFormModalOpen(false);
+          setEditingTour(null);
+        }}
         onSuccess={() => {
           setIsTourFormModalOpen(false);
+          setEditingTour(null);
           setCurrentTab('tours');
         }}
       />
@@ -525,7 +549,16 @@ export default function App() {
       {/* 7. Tour Package Details & Itinerary Modal */}
       <TourPackageDetailModal
         tour={selectedTourDetail}
+        currentUser={currentUser}
         onClose={() => setSelectedTourDetail(null)}
+        onEdit={(tour) => {
+          setEditingTour(tour);
+          setIsTourFormModalOpen(true);
+        }}
+        onDelete={(tourId) => {
+          storage.deleteTourPackage(tourId, currentUser);
+          setSelectedTourDetail(null);
+        }}
       />
 
       {/* 8. Admin KTA Card Customizer Modal */}

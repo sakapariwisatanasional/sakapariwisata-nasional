@@ -8,7 +8,8 @@ import {
   Compass, 
   Eye, 
   CheckCircle2, 
-  AlertTriangle 
+  AlertTriangle,
+  Edit3
 } from 'lucide-react';
 import { TourPackage } from '../../types';
 import { formatDriveImageUrl } from '../common/SakaLogo';
@@ -16,6 +17,8 @@ import { formatDriveImageUrl } from '../common/SakaLogo';
 interface TourPackageCardProps {
   tour: TourPackage;
   onViewDetail: (tour: TourPackage) => void;
+  onEdit?: (tour: TourPackage) => void;
+  canEdit?: boolean;
   onModerate?: (tour: TourPackage, action: 'APPROVE' | 'REJECT') => void;
   canModerate?: boolean;
 }
@@ -23,6 +26,8 @@ interface TourPackageCardProps {
 export const TourPackageCard: React.FC<TourPackageCardProps> = ({
   tour,
   onViewDetail,
+  onEdit,
+  canEdit = false,
   onModerate,
   canModerate = false
 }) => {
@@ -135,6 +140,16 @@ export const TourPackageCard: React.FC<TourPackageCardProps> = ({
             <Eye className="w-3.5 h-3.5" />
             <span>Lihat Detail & Itinerary</span>
           </button>
+
+          {canEdit && onEdit && (
+            <button
+              onClick={() => onEdit(tour)}
+              className="p-2 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-xl text-xs font-bold transition-colors cursor-pointer flex items-center justify-center"
+              title="Edit Data Paket Wisata"
+            >
+              <Edit3 className="w-3.5 h-3.5 text-amber-700" />
+            </button>
+          )}
 
           {canModerate && tour.status === 'SUBMITTED' && onModerate && (
             <div className="flex items-center gap-1">

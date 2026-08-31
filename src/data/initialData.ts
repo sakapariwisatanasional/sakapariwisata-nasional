@@ -63,21 +63,19 @@ export const MASTER_SKILLS: Skill[] = [
   }
 ];
 
-import { SHOWCASE_MEMBERS, SHOWCASE_TOURS, SHOWCASE_PRODUCTS, SHOWCASE_ACTIVITIES } from './showcaseData';
+// Database Awal Murni (Kosong secara default, data dimuat secara langsung dari Google Spreadsheet)
+export const INITIAL_MEMBERS: Member[] = [];
 
-// Database Anggota (Dilengkapi data percontohan kader terverifikasi di berbagai provinsi)
-export const INITIAL_MEMBERS: Member[] = SHOWCASE_MEMBERS;
+// Database Paket Wisata (Kosong secara default, bersumber dari Google Spreadsheet)
+export const INITIAL_TOUR_PACKAGES: TourPackage[] = [];
 
-// Database Paket Wisata (Dilengkapi paket ekowisata & destinasi unggulan)
-export const INITIAL_TOUR_PACKAGES: TourPackage[] = SHOWCASE_TOURS;
-
-// Database Agenda & Kegiatan Saka Pariwisata (Diupload Super Admin Kwarnas & Operator Daerah)
-export const INITIAL_ACTIVITIES: Activity[] = SHOWCASE_ACTIVITIES;
+// Database Agenda & Kegiatan Saka Pariwisata (Kosong secara default, bersumber dari Google Spreadsheet)
+export const INITIAL_ACTIVITIES: Activity[] = [];
 
 // Database Riwayat Audit Log (Kosong)
 export const INITIAL_AUDIT_LOGS: AuditLog[] = [];
 
-// Akun Pengguna Multi-Role (Super Admin Nasional, Anggota Terdaftar, dan Pengunjung Publik)
+// Akun Pengguna Resmi
 export const DEMO_USERS: CurrentUser[] = [
   {
     id: 'user-superadmin-rohadi',
@@ -91,28 +89,6 @@ export const DEMO_USERS: CurrentUser[] = [
     avatarUrl: 'https://lh3.googleusercontent.com/d/1Ml-oopzoEgnZ75ZoNuA79KytVhYf3qOV'
   },
   {
-    id: 'user-mem-rizky',
-    username: 'rizkymaulana',
-    password: 'rizkymaulana',
-    email: 'rizky.maulana@sakapariwisata.id',
-    name: 'Rizky Maulana, S.Par',
-    role: 'MEMBER',
-    jurisdictionName: 'Anggota Krida Pemandu (Kota Bandung)',
-    memberId: 'mem-jabar-01',
-    avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80'
-  },
-  {
-    id: 'user-mem-siti',
-    username: 'sitinurhaliza',
-    password: 'sitinurhaliza',
-    email: 'siti.nurhaliza@sakapariwisata.id',
-    name: 'Siti Nurhaliza, S.Tr.Par',
-    role: 'MEMBER',
-    jurisdictionName: 'Anggota Krida Penyuluh (Kab. Bandung)',
-    memberId: 'mem-jabar-02',
-    avatarUrl: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&auto=format&fit=crop&q=80'
-  },
-  {
     id: 'user-public-guest',
     username: 'wisatawan',
     email: 'wisatawan@nusantara.id',
@@ -123,5 +99,5 @@ export const DEMO_USERS: CurrentUser[] = [
   }
 ];
 
-// Database Kuliner & Cinderamata 4 Krida Daerah
-export const INITIAL_CULINARY_SOUVENIRS: CulinarySouvenirItem[] = SHOWCASE_PRODUCTS;
+// Database Kuliner & Cinderamata Daerah (Kosong secara default, bersumber dari Google Spreadsheet)
+export const INITIAL_CULINARY_SOUVENIRS: CulinarySouvenirItem[] = [];

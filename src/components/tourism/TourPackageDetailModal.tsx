@@ -13,21 +13,45 @@ import {
   Car, 
   Calendar,
   Share2,
-  Sparkles
+  Sparkles,
+  Edit3,
+  Trash2
 } from 'lucide-react';
-import { TourPackage } from '../../types';
+import { TourPackage, CurrentUser } from '../../types';
 import { formatDriveImageUrl } from '../common/SakaLogo';
 
 interface TourPackageDetailModalProps {
   tour: TourPackage | null;
+  currentUser?: CurrentUser;
   onClose: () => void;
+  onEdit?: (tour: TourPackage) => void;
+  onDelete?: (tourId: string) => void;
 }
 
 export const TourPackageDetailModal: React.FC<TourPackageDetailModalProps> = ({
   tour,
-  onClose
+  currentUser,
+  onClose,
+  onEdit,
+  onDelete
 }) => {
   if (!tour) return null;
+
+  const isOperatorOrAdmin = currentUser && [
+    'SUPER_ADMIN', 
+    'ADMIN_PROVINCE', 
+    'ADMIN_REGENCY', 
+    'ADMIN_BRANCH',
+    'OPERATOR'
+  ].includes(currentUser.role);
+
+  const isOwner = currentUser && (
+    currentUser.memberId === tour.ownerId || 
+    currentUser.id === tour.ownerId ||
+    currentUser.name === tour.ownerName
+  );
+
+  const canEdit = isOperatorOrAdmin || isOwner;
 
   const formatRupiah = (val: number) => {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(val);
@@ -188,10 +212,46 @@ export const TourPackageDetailModal: React.FC<TourPackageDetailModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t border-slate-200 bg-slate-50 flex items-center justify-between">
-          <span className="text-[10px] text-slate-400">
-            Ditinjau oleh Saka Pariwisata Indonesia
-          </span>
+        <div className="p-4 border-t border-slate-200 bg-slate-50 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            {canEdit && onEdit && (
+              <button
+                type="button"
+                onClick={() => {
+                  onEdit(tour);
+                  onClose();
+                }}
+                className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold rounded-xl text-xs flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors"
+              >
+                <Edit3 className="w-3.5 h-3.5" />
+                <span>Edit Paket Wisata</span>
+              </button>
+            )}
+
+            {canEdit && onDelete && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (confirm(`Apakah Anda yakin ingin menghapus paket wisata "${tour.title}"?`)) {
+                    onDelete(tour.id);
+                    onClose();
+                  }
+                }}
+                className="px-3 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold rounded-xl text-xs flex items-center gap-1 cursor-pointer transition-colors"
+                title="Hapus Paket Wisata"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Hapus</span>
+              </button>
+            )}
+
+            {!canEdit && (
+              <span className="text-[10px] text-slate-400">
+                Ditinjau oleh Saka Pariwisata Indonesia
+              </span>
+            )}
+          </div>
+
           <button
             onClick={onClose}
             className="px-5 py-2 bg-slate-900 text-white rounded-xl text-xs font-bold hover:bg-slate-800 cursor-pointer"

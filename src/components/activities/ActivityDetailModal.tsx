@@ -49,6 +49,7 @@ export const ActivityDetailModal: React.FC<ActivityDetailModalProps> = ({
     'SUPER_ADMIN', 
     'ADMIN_PROVINCE', 
     'ADMIN_REGENCY', 
+    'ADMIN_BRANCH',
     'OPERATOR'
   ].includes(currentUser.role);
 

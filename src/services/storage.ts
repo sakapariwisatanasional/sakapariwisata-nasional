@@ -76,7 +76,7 @@ class StorageService {
   }
 
   private init() {
-    // Bersihkan data lama v1 jika ada
+    // Bersihkan data lama jika ada
     const legacyKeys = [
       'saka_members_v1',
       'saka_tours_v1',
@@ -91,53 +91,58 @@ class StorageService {
     ];
     legacyKeys.forEach(k => localStorage.removeItem(k));
 
-    // Bersihkan data dummy anggota dan operator bawaan sistem dari storage
+    // Bersihkan semua data dummy/showcase bawaan sistem dari storage agar murni hanya menampilkan data spreadsheet
     try {
-      const dummyMemberIds = ['mem-nasional-01', 'mem-nasional-02'];
-      const dummyUserIds = ['user-kwarda-jabar', 'user-kwarcab-bandung', 'user-kwarran-ciwidey', 'user-nasional-rahmat'];
+      const dummyMemberPrefixes = ['mem-nasional-', 'mem-jabar-', 'mem-diy-', 'mem-jatim-', 'mem-bali-', 'mem-sumbar-', 'mem-sulsel-', 'mem-ntb-', 'mem-ntt-', 'showcase-'];
+      const dummyUserIds = ['user-kwarda-jabar', 'user-kwarcab-bandung', 'user-kwarran-ciwidey', 'user-nasional-rahmat', 'user-mem-rizky', 'user-mem-siti'];
       
       const rawMembers = localStorage.getItem(STORAGE_KEYS.MEMBERS);
       if (rawMembers) {
         const mems: Member[] = JSON.parse(rawMembers);
-        const filteredMems = mems.filter(m => !dummyMemberIds.includes(m.id));
-        if (filteredMems.length !== mems.length) {
-          localStorage.setItem(STORAGE_KEYS.MEMBERS, JSON.stringify(filteredMems));
-        }
+        const filteredMems = mems.filter(m => !dummyMemberPrefixes.some(prefix => m.id.startsWith(prefix)));
+        localStorage.setItem(STORAGE_KEYS.MEMBERS, JSON.stringify(filteredMems));
+      } else {
+        localStorage.setItem(STORAGE_KEYS.MEMBERS, JSON.stringify([]));
+      }
+
+      const rawTours = localStorage.getItem(STORAGE_KEYS.TOURS);
+      if (rawTours) {
+        const tours: TourPackage[] = JSON.parse(rawTours);
+        const filteredTours = tours.filter(t => !t.id.startsWith('tour-showcase-') && !t.id.startsWith('tour-ekowisata-') && !t.id.startsWith('tour-budaya-') && !t.id.startsWith('tour-kuliner-') && !t.id.startsWith('tour-bahari-'));
+        localStorage.setItem(STORAGE_KEYS.TOURS, JSON.stringify(filteredTours));
+      } else {
+        localStorage.setItem(STORAGE_KEYS.TOURS, JSON.stringify([]));
+      }
+
+      const rawActivities = localStorage.getItem(STORAGE_KEYS.ACTIVITIES);
+      if (rawActivities) {
+        const acts: Activity[] = JSON.parse(rawActivities);
+        const filteredActs = acts.filter(a => !a.id.startsWith('act-showcase-') && !a.id.startsWith('act-nasional-') && !a.id.startsWith('act-provinsi-') && !a.id.startsWith('act-cabang-'));
+        localStorage.setItem(STORAGE_KEYS.ACTIVITIES, JSON.stringify(filteredActs));
+      } else {
+        localStorage.setItem(STORAGE_KEYS.ACTIVITIES, JSON.stringify([]));
+      }
+
+      const rawCulinary = localStorage.getItem(STORAGE_KEYS.CULINARY_SOUVENIRS);
+      if (rawCulinary) {
+        const items: CulinarySouvenirItem[] = JSON.parse(rawCulinary);
+        const filteredItems = items.filter(c => !c.id.startsWith('prod-showcase-') && !c.id.startsWith('prod-kul-') && !c.id.startsWith('prod-cin-'));
+        localStorage.setItem(STORAGE_KEYS.CULINARY_SOUVENIRS, JSON.stringify(filteredItems));
+      } else {
+        localStorage.setItem(STORAGE_KEYS.CULINARY_SOUVENIRS, JSON.stringify([]));
       }
 
       const rawUsers = localStorage.getItem(STORAGE_KEYS.USERS);
       if (rawUsers) {
         const usrs: CurrentUser[] = JSON.parse(rawUsers);
-        const filteredUsrs = usrs.filter(u => !dummyUserIds.includes(u.id));
-        if (filteredUsrs.length !== usrs.length) {
-          localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(filteredUsrs));
-        }
+        const filteredUsrs = usrs.filter(u => !dummyUserIds.includes(u.id) && !dummyMemberPrefixes.some(prefix => (u.memberId || '').startsWith(prefix)));
+        localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(filteredUsrs));
       }
     } catch (e) {
       console.warn('Dummy cleanup error:', e);
     }
 
-    const isInitialized = localStorage.getItem(STORAGE_KEYS.IS_INITIALIZED);
-
-    // Hanya isi data bawaan saat pertama kali aplikasi diinisialisasi
-    if (!isInitialized) {
-      if (localStorage.getItem(STORAGE_KEYS.MEMBERS) === null) {
-        localStorage.setItem(STORAGE_KEYS.MEMBERS, JSON.stringify(INITIAL_MEMBERS));
-      }
-      if (localStorage.getItem(STORAGE_KEYS.TOURS) === null) {
-        localStorage.setItem(STORAGE_KEYS.TOURS, JSON.stringify(INITIAL_TOUR_PACKAGES));
-      }
-      if (localStorage.getItem(STORAGE_KEYS.ACTIVITIES) === null) {
-        localStorage.setItem(STORAGE_KEYS.ACTIVITIES, JSON.stringify(INITIAL_ACTIVITIES));
-      }
-      if (localStorage.getItem(STORAGE_KEYS.AUDIT_LOGS) === null) {
-        localStorage.setItem(STORAGE_KEYS.AUDIT_LOGS, JSON.stringify(INITIAL_AUDIT_LOGS));
-      }
-      if (localStorage.getItem(STORAGE_KEYS.CULINARY_SOUVENIRS) === null) {
-        localStorage.setItem(STORAGE_KEYS.CULINARY_SOUVENIRS, JSON.stringify(INITIAL_CULINARY_SOUVENIRS));
-      }
-      localStorage.setItem(STORAGE_KEYS.IS_INITIALIZED, 'true');
-    }
+    localStorage.setItem(STORAGE_KEYS.IS_INITIALIZED, 'true');
 
     if (!localStorage.getItem(STORAGE_KEYS.CURRENT_USER)) {
       localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(DEMO_USERS[0]));
@@ -235,6 +240,11 @@ class StorageService {
 
   public setCulinarySouvenirs(items: CulinarySouvenirItem[]) {
     localStorage.setItem(STORAGE_KEYS.CULINARY_SOUVENIRS, JSON.stringify(items));
+    this.notify();
+  }
+
+  public setActivities(activities: Activity[]) {
+    localStorage.setItem(STORAGE_KEYS.ACTIVITIES, JSON.stringify(activities));
     this.notify();
   }
 
@@ -1020,6 +1030,36 @@ class StorageService {
 
     this.notify();
     return newTour;
+  }
+
+  public updateTourPackage(tourId: string, payload: Partial<TourPackage>, user?: CurrentUser): TourPackage | null {
+    const tours = this.getTourPackages();
+    const idx = tours.findIndex(t => t.id === tourId);
+    if (idx === -1) return null;
+
+    const existing = tours[idx];
+    const updated: TourPackage = {
+      ...existing,
+      ...payload,
+      id: existing.id // protect ID
+    };
+
+    tours[idx] = updated;
+    localStorage.setItem(STORAGE_KEYS.TOURS, JSON.stringify(tours));
+
+    const currentUser = user || this.getCurrentUser();
+    this.addAuditLog(
+      currentUser.id,
+      currentUser.name,
+      currentUser.role,
+      'UPDATE_TOUR_PACKAGE',
+      'TOUR_PACKAGE',
+      tourId,
+      `Pembaruan data paket wisata "${updated.title}" oleh ${currentUser.name}`
+    );
+
+    this.notify();
+    return updated;
   }
 
   public moderateTourPackage(tourId: string, status: TourStatus, reviewerName: string, rejectionReason?: string) {

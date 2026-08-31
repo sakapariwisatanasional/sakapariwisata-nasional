@@ -25,6 +25,7 @@ interface TourismDirectoryViewProps {
   onOpenTourFormModal: () => void;
   onViewTourDetail: (tour: TourPackage) => void;
   onOpenVerifyModal: (member: Member) => void;
+  onEditTour?: (tour: TourPackage) => void;
 }
 
 export const TourismDirectoryView: React.FC<TourismDirectoryViewProps> = ({
@@ -34,7 +35,8 @@ export const TourismDirectoryView: React.FC<TourismDirectoryViewProps> = ({
   members,
   onOpenTourFormModal,
   onViewTourDetail,
-  onOpenVerifyModal
+  onOpenVerifyModal,
+  onEditTour
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
@@ -193,15 +195,20 @@ export const TourismDirectoryView: React.FC<TourismDirectoryViewProps> = ({
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredTours.map((tour) => (
-            <TourPackageCard
-              key={tour.id}
-              tour={tour}
-              onViewDetail={onViewTourDetail}
-              onModerate={handleModerate}
-              canModerate={isAdmin}
-            />
-          ))}
+          {filteredTours.map((tour) => {
+            const canEdit = isAdmin || (currentUser.role === 'MEMBER' && tour.ownerId === (currentUser.memberId || currentUser.id));
+            return (
+              <TourPackageCard
+                key={tour.id}
+                tour={tour}
+                onViewDetail={onViewTourDetail}
+                onEdit={onEditTour}
+                canEdit={canEdit}
+                onModerate={handleModerate}
+                canModerate={isAdmin}
+              />
+            );
+          })}
         </div>
       )}
 

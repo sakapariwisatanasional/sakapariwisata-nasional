@@ -64,7 +64,8 @@ export const CulinarySouvenirDetailModal: React.FC<CulinarySouvenirDetailModalPr
     'SUPER_ADMIN', 
     'ADMIN_PROVINCE', 
     'ADMIN_REGENCY', 
-    'ADMIN_BRANCH'
+    'ADMIN_BRANCH',
+    'OPERATOR'
   ].includes(currentUser.role);
 
   const isAuthor = 
