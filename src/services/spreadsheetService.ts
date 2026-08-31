@@ -1903,7 +1903,7 @@ function doPost(e) {
 }
 
 function getOrCreateDriveFolder(folderId) {
-  if (folderId && folderId.trim()) {
+  if (folderId && typeof folderId === "string" && folderId.trim()) {
     try {
       var folder = DriveApp.getFolderById(folderId.trim());
       if (folder && !folder.isTrashed()) return folder;
@@ -1912,18 +1912,31 @@ function getOrCreateDriveFolder(folderId) {
     }
   }
 
-  var existing = DriveApp.getRootFolder().getFoldersByName("SAKA_PARIWISATA_DATABASE_MEDIA");
-  while (existing.hasNext()) {
-    var f = existing.next();
-    if (!f.isTrashed()) return f;
-  }
+  try {
+    var existing = DriveApp.getRootFolder().getFoldersByName("SAKA_PARIWISATA_DATABASE_MEDIA");
+    while (existing.hasNext()) {
+      var f = existing.next();
+      if (!f.isTrashed()) return f;
+    }
 
-  var newRoot = DriveApp.getRootFolder().createFolder("SAKA_PARIWISATA_DATABASE_MEDIA");
-  newRoot.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-  return newRoot;
+    var newRoot = DriveApp.getRootFolder().createFolder("SAKA_PARIWISATA_DATABASE_MEDIA");
+    newRoot.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    return newRoot;
+  } catch (driveErr) {
+    Logger.log("Drive root error: " + driveErr.toString());
+    return DriveApp.getRootFolder();
+  }
 }
 
 function setupAllSubfolders(rootFolder) {
+  // Pengaman: Jika fungsi dijalankan langsung dari dropdown Apps Script tanpa parameter
+  if (!rootFolder || typeof rootFolder.getFoldersByName !== "function") {
+    rootFolder = getOrCreateDriveFolder(MASTER_DRIVE_FOLDER_ID);
+  }
+  if (!rootFolder || typeof rootFolder.getFoldersByName !== "function") {
+    rootFolder = DriveApp.getRootFolder();
+  }
+
   var folderNames = [
     "01_Pas_Foto_KTA_Anggota",
     "02_Paket_Wisata",
@@ -1934,9 +1947,51 @@ function setupAllSubfolders(rootFolder) {
 
   var map = {};
   folderNames.forEach(function(fName) {
-    var it = rootFolder.getFoldersByName(fName);
+    try {
+      var it = rootFolder.getFoldersByName(fName);
+      var found = null;
+      while (it && it.hasNext()) {
+        var f = it.next();
+        if (!f.isTrashed()) {
+          found = f;
+          break;
+        }
+      }
+
+      if (found) {
+        map[fName] = found;
+      } else {
+        var target = rootFolder.createFolder(fName);
+        target.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+        map[fName] = target;
+      }
+    } catch (subErr) {
+      Logger.log("Subfolder setup info (" + fName + "): " + subErr.toString());
+    }
+  });
+
+  return map;
+}
+
+function getCategorySubfolder(rootFolder, category) {
+  // Pengaman: Jika rootFolder kosong
+  if (!rootFolder || typeof rootFolder.getFoldersByName !== "function") {
+    rootFolder = getOrCreateDriveFolder(MASTER_DRIVE_FOLDER_ID);
+  }
+  if (!rootFolder || typeof rootFolder.getFoldersByName !== "function") {
+    rootFolder = DriveApp.getRootFolder();
+  }
+
+  var targetName = "01_Pas_Foto_KTA_Anggota";
+  if (category === "TOUR_PACKAGES") targetName = "02_Paket_Wisata";
+  else if (category === "CULINARY_SOUVENIRS") targetName = "03_Kuliner_dan_Cinderamata";
+  else if (category === "DOCUMENTS" || category === "KTA_CARD") targetName = "05_Dokumen_dan_Surat";
+  else if (category === "ACTIVITIES") targetName = "04_Agenda_Kegiatan";
+
+  try {
+    var it = rootFolder.getFoldersByName(targetName);
     var found = null;
-    while (it.hasNext()) {
+    while (it && it.hasNext()) {
       var f = it.next();
       if (!f.isTrashed()) {
         found = f;
@@ -1945,40 +2000,15 @@ function setupAllSubfolders(rootFolder) {
     }
 
     if (found) {
-      map[fName] = found;
+      return found;
     } else {
-      var target = rootFolder.createFolder(fName);
-      target.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-      map[fName] = target;
+      var created = rootFolder.createFolder(targetName);
+      created.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+      return created;
     }
-  });
-
-  return map;
-}
-
-function getCategorySubfolder(rootFolder, category) {
-  var targetName = "01_Pas_Foto_KTA_Anggota";
-  if (category === "TOUR_PACKAGES") targetName = "02_Paket_Wisata";
-  else if (category === "CULINARY_SOUVENIRS") targetName = "03_Kuliner_dan_Cinderamata";
-  else if (category === "DOCUMENTS" || category === "KTA_CARD") targetName = "05_Dokumen_dan_Surat";
-  else if (category === "ACTIVITIES") targetName = "04_Agenda_Kegiatan";
-
-  var it = rootFolder.getFoldersByName(targetName);
-  var found = null;
-  while (it.hasNext()) {
-    var f = it.next();
-    if (!f.isTrashed()) {
-      found = f;
-      break;
-    }
-  }
-
-  if (found) {
-    return found;
-  } else {
-    var created = rootFolder.createFolder(targetName);
-    created.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-    return created;
+  } catch (err) {
+    Logger.log("getCategorySubfolder error: " + err.toString());
+    return rootFolder;
   }
 }
 
