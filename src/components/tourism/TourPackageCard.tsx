@@ -9,7 +9,8 @@ import {
   Eye, 
   CheckCircle2, 
   AlertTriangle,
-  Edit3
+  Edit3,
+  Trash2
 } from 'lucide-react';
 import { TourPackage } from '../../types';
 import { formatDriveImageUrl } from '../common/SakaLogo';
@@ -18,6 +19,7 @@ interface TourPackageCardProps {
   tour: TourPackage;
   onViewDetail: (tour: TourPackage) => void;
   onEdit?: (tour: TourPackage) => void;
+  onDelete?: (tour: TourPackage) => void;
   canEdit?: boolean;
   onModerate?: (tour: TourPackage, action: 'APPROVE' | 'REJECT') => void;
   canModerate?: boolean;
@@ -27,6 +29,7 @@ export const TourPackageCard: React.FC<TourPackageCardProps> = ({
   tour,
   onViewDetail,
   onEdit,
+  onDelete,
   canEdit = false,
   onModerate,
   canModerate = false
@@ -148,6 +151,20 @@ export const TourPackageCard: React.FC<TourPackageCardProps> = ({
               title="Edit Data Paket Wisata"
             >
               <Edit3 className="w-3.5 h-3.5 text-amber-700" />
+            </button>
+          )}
+
+          {canEdit && onDelete && (
+            <button
+              onClick={() => {
+                if (confirm(`Apakah Anda yakin ingin menghapus paket wisata "${tour.title}"?`)) {
+                  onDelete(tour);
+                }
+              }}
+              className="p-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold transition-colors cursor-pointer flex items-center justify-center"
+              title="Hapus Paket Wisata"
+            >
+              <Trash2 className="w-3.5 h-3.5 text-rose-600" />
             </button>
           )}
 

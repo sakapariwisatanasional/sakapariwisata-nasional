@@ -26,6 +26,7 @@ interface TourismDirectoryViewProps {
   onViewTourDetail: (tour: TourPackage) => void;
   onOpenVerifyModal: (member: Member) => void;
   onEditTour?: (tour: TourPackage) => void;
+  onDeleteTour?: (tourId: string) => void;
 }
 
 export const TourismDirectoryView: React.FC<TourismDirectoryViewProps> = ({
@@ -36,7 +37,8 @@ export const TourismDirectoryView: React.FC<TourismDirectoryViewProps> = ({
   onOpenTourFormModal,
   onViewTourDetail,
   onOpenVerifyModal,
-  onEditTour
+  onEditTour,
+  onDeleteTour
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
@@ -203,6 +205,13 @@ export const TourismDirectoryView: React.FC<TourismDirectoryViewProps> = ({
                 tour={tour}
                 onViewDetail={onViewTourDetail}
                 onEdit={onEditTour}
+                onDelete={(t) => {
+                  if (onDeleteTour) {
+                    onDeleteTour(t.id);
+                  } else {
+                    storage.deleteTourPackage(t.id, currentUser);
+                  }
+                }}
                 canEdit={canEdit}
                 onModerate={handleModerate}
                 canModerate={isAdmin}

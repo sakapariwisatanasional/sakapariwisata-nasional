@@ -250,7 +250,16 @@ export default function App() {
 
         <TourPackageDetailModal
           tour={selectedTourDetail}
+          currentUser={currentUser}
           onClose={() => setSelectedTourDetail(null)}
+          onEdit={(tour) => {
+            setEditingTour(tour);
+            setIsTourFormModalOpen(true);
+          }}
+          onDelete={(tourId) => {
+            storage.deleteTourPackage(tourId, currentUser);
+            setSelectedTourDetail(null);
+          }}
         />
 
         <CulinarySouvenirDetailModal
@@ -421,6 +430,9 @@ export default function App() {
                 onEditTour={(t) => {
                   setEditingTour(t);
                   setIsTourFormModalOpen(true);
+                }}
+                onDeleteTour={(tId) => {
+                  storage.deleteTourPackage(tId, currentUser);
                 }}
               />
             )}

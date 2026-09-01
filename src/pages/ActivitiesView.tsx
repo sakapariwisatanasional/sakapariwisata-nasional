@@ -14,7 +14,9 @@ import {
   Phone,
   Info,
   Building2,
-  Calendar
+  Calendar,
+  Trash2,
+  Edit3
 } from 'lucide-react';
 import { Activity, CurrentUser } from '../types';
 import { storage } from '../services/storage';
@@ -338,7 +340,7 @@ export const ActivitiesView: React.FC<ActivitiesViewProps> = ({
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => setSelectedActivity(act)}
-                      className="flex-1 py-2 bg-white hover:bg-slate-100 text-slate-700 font-semibold rounded-xl text-xs transition-colors border border-slate-200 flex items-center justify-center gap-1.5"
+                      className="flex-1 py-2 bg-white hover:bg-slate-100 text-slate-700 font-semibold rounded-xl text-xs transition-colors border border-slate-200 flex items-center justify-center gap-1.5 cursor-pointer"
                     >
                       <Ticket className="w-3.5 h-3.5 text-purple-700" />
                       <span>Detail & Pendaftaran</span>
@@ -351,10 +353,26 @@ export const ActivitiesView: React.FC<ActivitiesViewProps> = ({
                           setEditingActivity(act);
                           setIsFormOpen(true);
                         }}
-                        className="px-3 py-2 bg-slate-100 hover:bg-purple-100 text-slate-700 hover:text-purple-900 rounded-xl text-xs font-semibold border border-slate-200 transition-colors"
+                        className="p-2 bg-amber-50 hover:bg-amber-100 text-amber-800 rounded-xl text-xs font-bold border border-amber-200 transition-colors cursor-pointer flex items-center justify-center"
                         title="Edit Agenda Kegiatan"
                       >
-                        Edit
+                        <Edit3 className="w-3.5 h-3.5 text-amber-700" />
+                      </button>
+                    )}
+
+                    {/* Delete for Operators/Super Admins */}
+                    {isOperatorOrAdmin && (
+                      <button
+                        onClick={() => {
+                          if (confirm(`Apakah Anda yakin ingin menghapus agenda kegiatan "${act.title}"?`)) {
+                            storage.deleteActivity(act.id, currentUser);
+                            refreshActivities();
+                          }
+                        }}
+                        className="p-2 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-xl text-xs font-bold border border-rose-200 transition-colors cursor-pointer flex items-center justify-center"
+                        title="Hapus Agenda Kegiatan"
+                      >
+                        <Trash2 className="w-3.5 h-3.5 text-rose-600" />
                       </button>
                     )}
                   </div>
@@ -375,6 +393,16 @@ export const ActivitiesView: React.FC<ActivitiesViewProps> = ({
             refreshActivities();
             const updated = storage.getActivities().find(a => a.id === selectedActivity.id);
             if (updated) setSelectedActivity(updated);
+          }}
+          onEditActivity={(act) => {
+            setSelectedActivity(null);
+            setEditingActivity(act);
+            setIsFormOpen(true);
+          }}
+          onDeleteActivity={(actId) => {
+            storage.deleteActivity(actId, currentUser);
+            refreshActivities();
+            setSelectedActivity(null);
           }}
         />
       )}

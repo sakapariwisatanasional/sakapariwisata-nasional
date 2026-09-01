@@ -1418,7 +1418,12 @@ export const IntegratedTourismShowcaseGallery: React.FC<IntegratedTourismShowcas
       {modalTour && (
         <TourPackageDetailModal
           tour={modalTour}
+          currentUser={currentUser}
           onClose={() => setModalTour(null)}
+          onDelete={(tourId) => {
+            storage.deleteTourPackage(tourId, currentUser);
+            setModalTour(null);
+          }}
         />
       )}
 
@@ -1427,6 +1432,10 @@ export const IntegratedTourismShowcaseGallery: React.FC<IntegratedTourismShowcas
           item={modalProduct}
           currentUser={currentUser}
           onClose={() => setModalProduct(null)}
+          onDelete={(id) => {
+            storage.deleteCulinarySouvenir(id, currentUser);
+            setModalProduct(null);
+          }}
         />
       )}
 
@@ -1446,6 +1455,16 @@ export const IntegratedTourismShowcaseGallery: React.FC<IntegratedTourismShowcas
             refreshActivities();
             const updated = storage.getActivities().find(a => a.id === modalActivity.id);
             if (updated) setModalActivity(updated);
+          }}
+          onEditActivity={(act) => {
+            setModalActivity(null);
+            setEditingActivity(act);
+            setIsActivityFormOpen(true);
+          }}
+          onDeleteActivity={(actId) => {
+            storage.deleteActivity(actId, currentUser);
+            refreshActivities();
+            setModalActivity(null);
           }}
         />
       )}

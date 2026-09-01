@@ -23,7 +23,9 @@ import {
   User,
   SlidersHorizontal,
   Check,
-  X
+  X,
+  Edit3,
+  Trash2
 } from 'lucide-react';
 import { CulinarySouvenirItem, CurrentUser, KridaType, ProductModerationStatus } from '../../types';
 import { storage } from '../../services/storage';
@@ -395,6 +397,7 @@ export const CulinarySouvenirGallerySection: React.FC<CulinarySouvenirGallerySec
             const KridaCardIcon = getKridaIcon(item.krida);
             const isPending = item.status === 'PENDING_APPROVAL';
             const isRejected = item.status === 'REJECTED';
+            const isMine = currentUser.role === 'MEMBER' && (item.authorId === currentUser.memberId || item.authorId === currentUser.id);
 
             return (
               <div
@@ -520,10 +523,42 @@ export const CulinarySouvenirGallerySection: React.FC<CulinarySouvenirGallerySec
                         </span>
                       </div>
 
-                      <span className="text-xs font-bold text-purple-700 group-hover:translate-x-0.5 transition-transform flex items-center gap-0.5">
-                        <span>Rincian</span>
-                        <ChevronRight className="w-3.5 h-3.5" />
-                      </span>
+                      <div className="flex items-center gap-1.5">
+                        {/* Quick Edit for Super Admin / Operator / Author */}
+                        {(isOperator || isMine) && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onOpenFormModal(item);
+                            }}
+                            className="p-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-lg text-xs font-bold transition-colors cursor-pointer"
+                            title="Edit Data Produk / Karya"
+                          >
+                            <Edit3 className="w-3.5 h-3.5 text-amber-700" />
+                          </button>
+                        )}
+
+                        {/* Quick Delete for Super Admin / Operator / Author */}
+                        {(isOperator || isMine) && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (confirm(`Apakah Anda yakin ingin menghapus produk "${item.name}"?`)) {
+                                storage.deleteCulinarySouvenir(item.id, currentUser);
+                              }
+                            }}
+                            className="p-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-xs font-bold transition-colors cursor-pointer"
+                            title="Hapus Produk / Karya"
+                          >
+                            <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                          </button>
+                        )}
+
+                        <span className="text-xs font-bold text-purple-700 group-hover:translate-x-0.5 transition-transform flex items-center gap-0.5 ml-1">
+                          <span>Rincian</span>
+                          <ChevronRight className="w-3.5 h-3.5" />
+                        </span>
+                      </div>
                     </div>
 
                     {/* Operator Action Bar for Pending Items */}
